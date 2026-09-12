@@ -2,9 +2,7 @@
 -- YOKUDO HUB | NEW PROJECT | Tabs
 -- ==================================================
 
-local Y = _G.Y
-local Services = _G.YOKUDO.Services
-local Settings = _G.YOKUDO
+local TweenService = game:GetService("TweenService")
 
 -- ==================================================
 -- CREATE PAGES (ទទេ)
@@ -34,12 +32,12 @@ local function SelectTab(SelectedTab, SelectedPage)
         Page.Visible = false
         local Indicator = Tab:FindFirstChild("Indicator")
         local TabText = Tab:FindFirstChild("TabText")
-        Y.TS:Create(Tab, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(Tab, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
         if Indicator then
-            Y.TS:Create(Indicator, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(Indicator, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
         end
         if TabText then
-            Y.TS:Create(TabText, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(155, 155, 175)}):Play()
+            TweenService:Create(TabText, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(155, 155, 175)}):Play()
         end
     end
 
@@ -49,14 +47,14 @@ local function SelectTab(SelectedTab, SelectedPage)
         SelectedPage.CanvasPosition = Vector2.new(0, 0)
     end)
 
-    Y.TS:Create(SelectedTab, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
+    TweenService:Create(SelectedTab, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
     local Indicator = SelectedTab:FindFirstChild("Indicator")
     local TabText = SelectedTab:FindFirstChild("TabText")
     if Indicator then
-        Y.TS:Create(Indicator, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
+        TweenService:Create(Indicator, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
     end
     if TabText then
-        Y.TS:Create(TabText, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        TweenService:Create(TabText, TweenInfo.new(0.15), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
     end
 end
 
