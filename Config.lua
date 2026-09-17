@@ -5,7 +5,7 @@
 _G.YOKUDO = {
     -- Hub Info
     Name = "YOKUDO HUB | Steal An Egg",
-    Version = "1.0",
+    Version = "telegram : @maibigber",
     Author = "Yokudo",
 
     -- Asset
