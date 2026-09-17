@@ -4,7 +4,7 @@
 
 _G.YOKUDO = {
     -- Hub Info
-    Name = "YOKUDO HUB",
+    Name = "YOKUDO HUB | Steal An Egg",
     Version = "1.0",
     Author = "Yokudo",
 
