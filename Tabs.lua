@@ -178,20 +178,129 @@ HopServerLabel.LayoutOrder = 2
 HopServerLabel.Parent = HopServerPage
 
 -- ==================================================
--- 7. SETTING PAGE
+-- 7. SETTING PAGE (FEATURES)
 -- ==================================================
-CreateSectionTitle(SettingPage, "Setting", 1)
+CreateSectionTitle(SettingPage, "Settings", 1)
 
-local SettingLabel = Instance.new("TextLabel")
-SettingLabel.Size = UDim2.new(1, 0, 0, 30)
-SettingLabel.BackgroundTransparency = 1
-SettingLabel.Text = "Coming Soon..."
-SettingLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
-SettingLabel.TextSize = 12
-SettingLabel.TextXAlignment = Enum.TextXAlignment.Left
-SettingLabel.Font = Enum.Font.GothamMedium
-SettingLabel.LayoutOrder = 2
-SettingLabel.Parent = SettingPage
+-- ==================================================
+-- FEATURE 1: WALK SPEED
+-- ==================================================
+local WalkSpeedHolder, WalkSpeedCheck, WalkSpeedGetState, WalkSpeedTextBox, WalkSpeedGetValue = CreateTextBoxWithCheckbox(
+    SettingPage,
+    "Walk Speed",
+    2,
+    50,
+    50,
+    1200
+)
+
+-- ==================================================
+-- FEATURE 2: BYPASS ANTI CHEAT
+-- ==================================================
+local BypassHolder = Instance.new("Frame")
+BypassHolder.Size = UDim2.new(1, 0, 0, 32)
+BypassHolder.BackgroundTransparency = 1
+BypassHolder.LayoutOrder = 3
+BypassHolder.Parent = SettingPage
+
+local BypassLabel = Instance.new("TextLabel")
+BypassLabel.Size = UDim2.new(1, -110, 1, 0)
+BypassLabel.BackgroundTransparency = 1
+BypassLabel.Text = "Bypass Anti Cheat"
+BypassLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
+BypassLabel.TextSize = 12
+BypassLabel.TextXAlignment = Enum.TextXAlignment.Left
+BypassLabel.TextYAlignment = Enum.TextYAlignment.Center
+BypassLabel.Font = Enum.Font.GothamMedium
+BypassLabel.Parent = BypassHolder
+
+local BypassButton = Instance.new("TextButton")
+BypassButton.Size = UDim2.new(0, 100, 0, 26)
+BypassButton.Position = UDim2.new(1, -100, 0.5, -13)
+BypassButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+BypassButton.BorderSizePixel = 0
+BypassButton.Text = "Click for"
+BypassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BypassButton.TextSize = 12
+BypassButton.Font = Enum.Font.GothamBold
+BypassButton.AutoButtonColor = false
+BypassButton.Parent = BypassHolder
+
+local BypassCorner = Instance.new("UICorner")
+BypassCorner.CornerRadius = UDim.new(0, 6)
+BypassCorner.Parent = BypassButton
+
+-- ==================================================
+-- FEATURE 3: ANTI TRAP
+-- ==================================================
+local AntiTrapHolder = Instance.new("Frame")
+AntiTrapHolder.Size = UDim2.new(1, 0, 0, 32)
+AntiTrapHolder.BackgroundTransparency = 1
+AntiTrapHolder.LayoutOrder = 4
+AntiTrapHolder.Parent = SettingPage
+
+local AntiTrapLabel = Instance.new("TextLabel")
+AntiTrapLabel.Size = UDim2.new(1, -110, 1, 0)
+AntiTrapLabel.BackgroundTransparency = 1
+AntiTrapLabel.Text = "Anti Trap"
+AntiTrapLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
+AntiTrapLabel.TextSize = 12
+AntiTrapLabel.TextXAlignment = Enum.TextXAlignment.Left
+AntiTrapLabel.TextYAlignment = Enum.TextYAlignment.Center
+AntiTrapLabel.Font = Enum.Font.GothamMedium
+AntiTrapLabel.Parent = AntiTrapHolder
+
+local AntiTrapButton = Instance.new("TextButton")
+AntiTrapButton.Size = UDim2.new(0, 100, 0, 26)
+AntiTrapButton.Position = UDim2.new(1, -100, 0.5, -13)
+AntiTrapButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+AntiTrapButton.BorderSizePixel = 0
+AntiTrapButton.Text = "Click for"
+AntiTrapButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiTrapButton.TextSize = 12
+AntiTrapButton.Font = Enum.Font.GothamBold
+AntiTrapButton.AutoButtonColor = false
+AntiTrapButton.Parent = AntiTrapHolder
+
+local AntiTrapCorner = Instance.new("UICorner")
+AntiTrapCorner.CornerRadius = UDim.new(0, 6)
+AntiTrapCorner.Parent = AntiTrapButton
+
+-- ==================================================
+-- FEATURE 4: GOD MODE
+-- ==================================================
+local GodModeHolder = Instance.new("Frame")
+GodModeHolder.Size = UDim2.new(1, 0, 0, 32)
+GodModeHolder.BackgroundTransparency = 1
+GodModeHolder.LayoutOrder = 5
+GodModeHolder.Parent = SettingPage
+
+local GodModeLabel = Instance.new("TextLabel")
+GodModeLabel.Size = UDim2.new(1, -110, 1, 0)
+GodModeLabel.BackgroundTransparency = 1
+GodModeLabel.Text = "God Mode"
+GodModeLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
+GodModeLabel.TextSize = 12
+GodModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+GodModeLabel.TextYAlignment = Enum.TextYAlignment.Center
+GodModeLabel.Font = Enum.Font.GothamMedium
+GodModeLabel.Parent = GodModeHolder
+
+local GodModeButton = Instance.new("TextButton")
+GodModeButton.Size = UDim2.new(0, 100, 0, 26)
+GodModeButton.Position = UDim2.new(1, -100, 0.5, -13)
+GodModeButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+GodModeButton.BorderSizePixel = 0
+GodModeButton.Text = "Click for"
+GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+GodModeButton.TextSize = 12
+GodModeButton.Font = Enum.Font.GothamBold
+GodModeButton.AutoButtonColor = false
+GodModeButton.Parent = GodModeHolder
+
+local GodModeCorner = Instance.new("UICorner")
+GodModeCorner.CornerRadius = UDim.new(0, 6)
+GodModeCorner.Parent = GodModeButton
 
 -- ==================================================
 -- EXPORT
@@ -204,4 +313,17 @@ _G.YOKUDO_EventPage = EventPage
 _G.YOKUDO_HopServerPage = HopServerPage
 _G.YOKUDO_SettingPage = SettingPage
 
-print("✅ Tabs Loaded (7 Tabs)")
+_G.YOKUDO_Features = {
+    WalkSpeed = {
+        Holder = WalkSpeedHolder,
+        Check = WalkSpeedCheck,
+        GetState = WalkSpeedGetState,
+        TextBox = WalkSpeedTextBox,
+        GetValue = WalkSpeedGetValue
+    },
+    BypassButton = BypassButton,
+    AntiTrapButton = AntiTrapButton,
+    GodModeButton = GodModeButton
+}
+
+print("✅ Tabs Loaded (7 Tabs + Setting Features)")
