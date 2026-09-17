@@ -1,5 +1,5 @@
 -- ==================================================
--- YOKUDO HUB | NEW PROJECT | Loader
+-- YOKUDO HUB | STEAL AN EGG | Loader
 -- ==================================================
 
 local BASE_URL = "https://raw.githubusercontent.com/hotibody99828/stealvip/main/"
@@ -90,7 +90,7 @@ local function CreateLoadingScreen()
     Subtitle.Size = UDim2.new(1, -30, 0, 14)
     Subtitle.Position = UDim2.new(0, 15, 0, 36)
     Subtitle.BackgroundTransparency = 1
-    Subtitle.Text = "NEW PROJECT"
+    Subtitle.Text = "Steal An Egg"
     Subtitle.TextColor3 = Color3.fromRGB(145, 145, 175)
     Subtitle.TextSize = 9
     Subtitle.TextXAlignment = Enum.TextXAlignment.Center
@@ -156,19 +156,34 @@ local Loading = CreateLoadingScreen()
 Loading.Update(5)
 
 -- ==================================================
--- LOAD FILES
+-- LOAD CORE FILES
 -- ==================================================
-Loading.Update(15)
+Loading.Update(10)
 loadstring(GetScript("Config.lua"))()
 
-Loading.Update(35)
+Loading.Update(20)
 loadstring(GetScript("UI.lua"))()
 
-Loading.Update(55)
+Loading.Update(30)
 loadstring(GetScript("Components.lua"))()
 
-Loading.Update(75)
+Loading.Update(40)
 loadstring(GetScript("Tabs.lua"))()
+
+-- ==================================================
+-- LOAD FEATURES
+-- ==================================================
+Loading.Update(50)
+loadstring(GetScript("Features/WalkSpeed.lua"))()
+
+Loading.Update(60)
+loadstring(GetScript("Features/BypassAntiCheat.lua"))()
+
+Loading.Update(70)
+loadstring(GetScript("Features/AntiTrap.lua"))()
+
+Loading.Update(80)
+loadstring(GetScript("Features/GodMode.lua"))()
 
 Loading.Update(100)
 
