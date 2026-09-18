@@ -82,24 +82,32 @@ end
 SelectTab(InfoTab, InfoPage)
 
 -- ==================================================
--- BUTTON ANIMATION FUNCTION
+-- BUTTON ANIMATION FUNCTION (PRO)
 -- ==================================================
 local function AddButtonAnimation(Button)
-    Button.MouseButton1Down:Connect(function()
-        TweenService:Create(Button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset * 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset * 0.95)
+    Button.MouseEnter:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = Color3.fromRGB(125, 110, 220)
         }):Play()
     end)
-    
-    Button.MouseButton1Up:Connect(function()
-        TweenService:Create(Button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset / 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset / 0.95)
-        }):Play()
-    end)
-    
+
     Button.MouseLeave:Connect(function()
-        TweenService:Create(Button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset / 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset / 0.95)
+        TweenService:Create(Button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+        }):Play()
+    end)
+
+    Button.MouseButton1Down:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset * 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset * 0.95),
+            BackgroundColor3 = Color3.fromRGB(85, 70, 170)
+        }):Play()
+    end)
+
+    Button.MouseButton1Up:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset / 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset / 0.95),
+            BackgroundColor3 = Color3.fromRGB(125, 110, 220)
         }):Play()
     end)
 end
@@ -221,27 +229,28 @@ local WalkSpeedHolder, WalkSpeedCheck, WalkSpeedGetState, WalkSpeedTextBox, Walk
 -- FEATURE 2: BYPASS ANTI CHEAT
 -- ==================================================
 local BypassHolder = Instance.new("Frame")
-BypassHolder.Size = UDim2.new(1, 0, 0, 48)
+BypassHolder.Size = UDim2.new(1, 0, 0, 52)
 BypassHolder.BackgroundTransparency = 1
 BypassHolder.LayoutOrder = 3
 BypassHolder.Parent = SettingPage
 
 local BypassLabel = Instance.new("TextLabel")
-BypassLabel.Size = UDim2.new(1, -110, 0, 22)
+BypassLabel.Size = UDim2.new(1, -120, 0, 20)
+BypassLabel.Position = UDim2.new(0, 0, 0, 2)
 BypassLabel.BackgroundTransparency = 1
 BypassLabel.Text = "Bypass Anti Cheat"
-BypassLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
-BypassLabel.TextSize = 12
+BypassLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
+BypassLabel.TextSize = 13
 BypassLabel.TextXAlignment = Enum.TextXAlignment.Left
 BypassLabel.TextYAlignment = Enum.TextYAlignment.Center
-BypassLabel.Font = Enum.Font.GothamMedium
+BypassLabel.Font = Enum.Font.GothamBold
 BypassLabel.Parent = BypassHolder
 
 local BypassTitle = Instance.new("TextLabel")
-BypassTitle.Size = UDim2.new(1, 0, 0, 16)
-BypassTitle.Position = UDim2.new(0, 0, 0, 26)
+BypassTitle.Size = UDim2.new(1, -120, 0, 18)
+BypassTitle.Position = UDim2.new(0, 0, 0, 24)
 BypassTitle.BackgroundTransparency = 1
-BypassTitle.Text = "When Player Dead click Bypass Anti Cheat នេះ"
+BypassTitle.Text = "When Character Dead click Bypass Anti Cheat"
 BypassTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
 BypassTitle.TextSize = 10
 BypassTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -249,20 +258,26 @@ BypassTitle.Font = Enum.Font.Gotham
 BypassTitle.Parent = BypassHolder
 
 local BypassButton = Instance.new("TextButton")
-BypassButton.Size = UDim2.new(0, 100, 0, 26)
-BypassButton.Position = UDim2.new(1, -100, 0, 5)
+BypassButton.Size = UDim2.new(0, 110, 0, 30)
+BypassButton.Position = UDim2.new(1, -110, 0.5, -15)
 BypassButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 BypassButton.BorderSizePixel = 0
 BypassButton.Text = "Click"
 BypassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-BypassButton.TextSize = 12
+BypassButton.TextSize = 13
 BypassButton.Font = Enum.Font.GothamBold
 BypassButton.AutoButtonColor = false
 BypassButton.Parent = BypassHolder
 
 local BypassCorner = Instance.new("UICorner")
-BypassCorner.CornerRadius = UDim.new(0, 6)
+BypassCorner.CornerRadius = UDim.new(0, 8)
 BypassCorner.Parent = BypassButton
+
+local BypassStroke = Instance.new("UIStroke")
+BypassStroke.Color = Color3.fromRGB(140, 125, 240)
+BypassStroke.Thickness = 1.5
+BypassStroke.Transparency = 0.3
+BypassStroke.Parent = BypassButton
 
 AddButtonAnimation(BypassButton)
 
@@ -279,27 +294,28 @@ local AntiTrapHolder, AntiTrapCheck, AntiTrapGetState = CreateCheckbox(
 -- FEATURE 4: GOD MODE
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
-GodModeHolder.Size = UDim2.new(1, 0, 0, 48)
+GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
 GodModeHolder.BackgroundTransparency = 1
 GodModeHolder.LayoutOrder = 5
 GodModeHolder.Parent = SettingPage
 
 local GodModeLabel = Instance.new("TextLabel")
-GodModeLabel.Size = UDim2.new(1, -110, 0, 22)
+GodModeLabel.Size = UDim2.new(1, -120, 0, 20)
+GodModeLabel.Position = UDim2.new(0, 0, 0, 2)
 GodModeLabel.BackgroundTransparency = 1
 GodModeLabel.Text = "God Mode"
-GodModeLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
-GodModeLabel.TextSize = 12
+GodModeLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
+GodModeLabel.TextSize = 13
 GodModeLabel.TextXAlignment = Enum.TextXAlignment.Left
 GodModeLabel.TextYAlignment = Enum.TextYAlignment.Center
-GodModeLabel.Font = Enum.Font.GothamMedium
+GodModeLabel.Font = Enum.Font.GothamBold
 GodModeLabel.Parent = GodModeHolder
 
 local GodModeTitle = Instance.new("TextLabel")
-GodModeTitle.Size = UDim2.new(1, 0, 0, 16)
-GodModeTitle.Position = UDim2.new(0, 0, 0, 26)
+GodModeTitle.Size = UDim2.new(1, -120, 0, 18)
+GodModeTitle.Position = UDim2.new(0, 0, 0, 24)
 GodModeTitle.BackgroundTransparency = 1
-GodModeTitle.Text = "Enable God Mode to become invincible"
+GodModeTitle.Text = "When Character Dead click God Mode"
 GodModeTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
 GodModeTitle.TextSize = 10
 GodModeTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -307,20 +323,26 @@ GodModeTitle.Font = Enum.Font.Gotham
 GodModeTitle.Parent = GodModeHolder
 
 local GodModeButton = Instance.new("TextButton")
-GodModeButton.Size = UDim2.new(0, 100, 0, 26)
-GodModeButton.Position = UDim2.new(1, -100, 0, 5)
+GodModeButton.Size = UDim2.new(0, 110, 0, 30)
+GodModeButton.Position = UDim2.new(1, -110, 0.5, -15)
 GodModeButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 GodModeButton.BorderSizePixel = 0
 GodModeButton.Text = "Click"
 GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-GodModeButton.TextSize = 12
+GodModeButton.TextSize = 13
 GodModeButton.Font = Enum.Font.GothamBold
 GodModeButton.AutoButtonColor = false
 GodModeButton.Parent = GodModeHolder
 
 local GodModeCorner = Instance.new("UICorner")
-GodModeCorner.CornerRadius = UDim.new(0, 6)
+GodModeCorner.CornerRadius = UDim.new(0, 8)
 GodModeCorner.Parent = GodModeButton
+
+local GodModeStroke = Instance.new("UIStroke")
+GodModeStroke.Color = Color3.fromRGB(140, 125, 240)
+GodModeStroke.Thickness = 1.5
+GodModeStroke.Transparency = 0.3
+GodModeStroke.Parent = GodModeButton
 
 AddButtonAnimation(GodModeButton)
 
