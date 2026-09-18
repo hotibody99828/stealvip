@@ -214,19 +214,107 @@ HopServerLabel.Parent = HopServerPage
 CreateSectionTitle(SettingPage, "Settings", 1)
 
 -- ==================================================
--- FEATURE 1: WALK SPEED
+-- FEATURE 1: WALK SPEED (SHORT)
 -- ==================================================
-local WalkSpeedHolder, WalkSpeedCheck, WalkSpeedGetState, WalkSpeedTextBox, WalkSpeedGetValue = CreateTextBoxWithCheckbox(
-    SettingPage,
-    "Walk Speed",
-    2,
-    50,
-    50,
-    1200
-)
+local WalkSpeedHolder = Instance.new("Frame")
+WalkSpeedHolder.Size = UDim2.new(1, 0, 0, 32)
+WalkSpeedHolder.BackgroundTransparency = 1
+WalkSpeedHolder.LayoutOrder = 2
+WalkSpeedHolder.Parent = SettingPage
+
+local WalkSpeedLabel = Instance.new("TextLabel")
+WalkSpeedLabel.Size = UDim2.new(0, 100, 1, 0)
+WalkSpeedLabel.BackgroundTransparency = 1
+WalkSpeedLabel.Text = "Walk Speed"
+WalkSpeedLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
+WalkSpeedLabel.TextSize = 12
+WalkSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+WalkSpeedLabel.TextYAlignment = Enum.TextYAlignment.Center
+WalkSpeedLabel.Font = Enum.Font.GothamMedium
+WalkSpeedLabel.Parent = WalkSpeedHolder
+
+local WalkSpeedTextBox = Instance.new("TextBox")
+WalkSpeedTextBox.Size = UDim2.new(0, 40, 1, -6)
+WalkSpeedTextBox.Position = UDim2.new(0, 105, 0, 3)
+WalkSpeedTextBox.BackgroundColor3 = Color3.fromRGB(30, 31, 45)
+WalkSpeedTextBox.BorderSizePixel = 0
+WalkSpeedTextBox.Text = "50"
+WalkSpeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+WalkSpeedTextBox.TextSize = 12
+WalkSpeedTextBox.TextXAlignment = Enum.TextXAlignment.Center
+WalkSpeedTextBox.TextYAlignment = Enum.TextYAlignment.Center
+WalkSpeedTextBox.Font = Enum.Font.GothamMedium
+WalkSpeedTextBox.Parent = WalkSpeedHolder
+
+local WalkSpeedBoxCorner = Instance.new("UICorner")
+WalkSpeedBoxCorner.CornerRadius = UDim.new(0, 4)
+WalkSpeedBoxCorner.Parent = WalkSpeedTextBox
+
+local WalkSpeedBoxStroke = Instance.new("UIStroke")
+WalkSpeedBoxStroke.Color = Color3.fromRGB(200, 200, 220)
+WalkSpeedBoxStroke.Thickness = 0.5
+WalkSpeedBoxStroke.Transparency = 0.2
+WalkSpeedBoxStroke.Parent = WalkSpeedTextBox
+
+local WalkSpeedCheckButton = Instance.new("TextButton")
+WalkSpeedCheckButton.Size = UDim2.new(0, 26, 0, 26)
+WalkSpeedCheckButton.Position = UDim2.new(1, -26, 0.5, -13)
+WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+WalkSpeedCheckButton.BorderSizePixel = 0
+WalkSpeedCheckButton.Text = ""
+WalkSpeedCheckButton.AutoButtonColor = false
+WalkSpeedCheckButton.Parent = WalkSpeedHolder
+
+local WalkSpeedCorner = Instance.new("UICorner")
+WalkSpeedCorner.CornerRadius = UDim.new(0, 6)
+WalkSpeedCorner.Parent = WalkSpeedCheckButton
+
+local WalkSpeedStroke = Instance.new("UIStroke")
+WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
+WalkSpeedStroke.Thickness = 1.5
+WalkSpeedStroke.Parent = WalkSpeedCheckButton
+
+local WalkSpeedCheck = Instance.new("TextLabel")
+WalkSpeedCheck.Size = UDim2.new(1, 0, 1, 0)
+WalkSpeedCheck.BackgroundTransparency = 1
+WalkSpeedCheck.Text = "✓"
+WalkSpeedCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+WalkSpeedCheck.TextSize = 18
+WalkSpeedCheck.Font = Enum.Font.GothamBold
+WalkSpeedCheck.Visible = false
+WalkSpeedCheck.Parent = WalkSpeedCheckButton
+
+local WalkSpeedEnabled = false
+local WalkSpeedValue = 50
+
+local function ToggleWalkSpeed()
+    WalkSpeedEnabled = not WalkSpeedEnabled
+    WalkSpeedCheck.Visible = WalkSpeedEnabled
+    if WalkSpeedEnabled then
+        WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+        WalkSpeedStroke.Color = Color3.fromRGB(135, 120, 225)
+    else
+        WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+        WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
+    end
+end
+
+WalkSpeedCheckButton.MouseButton1Click:Connect(function()
+    ToggleWalkSpeed()
+end)
+
+WalkSpeedTextBox.FocusLost:Connect(function()
+    local val = tonumber(WalkSpeedTextBox.Text)
+    if val then
+        WalkSpeedValue = math.clamp(val, 50, 1200)
+        WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
+    else
+        WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
+    end
+end)
 
 -- ==================================================
--- FEATURE 2: BYPASS ANTI CHEAT
+-- FEATURE 2: BYPASS ANTI CHEAT (SHORT BUTTON)
 -- ==================================================
 local BypassHolder = Instance.new("Frame")
 BypassHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -235,7 +323,7 @@ BypassHolder.LayoutOrder = 3
 BypassHolder.Parent = SettingPage
 
 local BypassLabel = Instance.new("TextLabel")
-BypassLabel.Size = UDim2.new(1, -120, 0, 20)
+BypassLabel.Size = UDim2.new(1, -70, 0, 20)
 BypassLabel.Position = UDim2.new(0, 0, 0, 2)
 BypassLabel.BackgroundTransparency = 1
 BypassLabel.Text = "Bypass Anti Cheat"
@@ -247,7 +335,7 @@ BypassLabel.Font = Enum.Font.GothamBold
 BypassLabel.Parent = BypassHolder
 
 local BypassTitle = Instance.new("TextLabel")
-BypassTitle.Size = UDim2.new(1, -120, 0, 18)
+BypassTitle.Size = UDim2.new(1, -70, 0, 18)
 BypassTitle.Position = UDim2.new(0, 0, 0, 24)
 BypassTitle.BackgroundTransparency = 1
 BypassTitle.Text = "When Character Dead click Bypass Anti Cheat"
@@ -258,11 +346,11 @@ BypassTitle.Font = Enum.Font.Gotham
 BypassTitle.Parent = BypassHolder
 
 local BypassButton = Instance.new("TextButton")
-BypassButton.Size = UDim2.new(0, 110, 0, 30)
-BypassButton.Position = UDim2.new(1, -110, 0.5, -15)
+BypassButton.Size = UDim2.new(0, 26, 0, 26)
+BypassButton.Position = UDim2.new(1, -26, 0.5, -13)
 BypassButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 BypassButton.BorderSizePixel = 0
-BypassButton.Text = "Click"
+BypassButton.Text = "C"
 BypassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 BypassButton.TextSize = 13
 BypassButton.Font = Enum.Font.GothamBold
@@ -270,7 +358,7 @@ BypassButton.AutoButtonColor = false
 BypassButton.Parent = BypassHolder
 
 local BypassCorner = Instance.new("UICorner")
-BypassCorner.CornerRadius = UDim.new(0, 8)
+BypassCorner.CornerRadius = UDim.new(0, 6)
 BypassCorner.Parent = BypassButton
 
 local BypassStroke = Instance.new("UIStroke")
@@ -360,7 +448,7 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 4: GOD MODE
+-- FEATURE 4: GOD MODE (SHORT BUTTON)
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -369,7 +457,7 @@ GodModeHolder.LayoutOrder = 5
 GodModeHolder.Parent = SettingPage
 
 local GodModeLabel = Instance.new("TextLabel")
-GodModeLabel.Size = UDim2.new(1, -120, 0, 20)
+GodModeLabel.Size = UDim2.new(1, -70, 0, 20)
 GodModeLabel.Position = UDim2.new(0, 0, 0, 2)
 GodModeLabel.BackgroundTransparency = 1
 GodModeLabel.Text = "God Mode"
@@ -381,7 +469,7 @@ GodModeLabel.Font = Enum.Font.GothamBold
 GodModeLabel.Parent = GodModeHolder
 
 local GodModeTitle = Instance.new("TextLabel")
-GodModeTitle.Size = UDim2.new(1, -120, 0, 18)
+GodModeTitle.Size = UDim2.new(1, -70, 0, 18)
 GodModeTitle.Position = UDim2.new(0, 0, 0, 24)
 GodModeTitle.BackgroundTransparency = 1
 GodModeTitle.Text = "When Character Dead click God Mode"
@@ -392,11 +480,11 @@ GodModeTitle.Font = Enum.Font.Gotham
 GodModeTitle.Parent = GodModeHolder
 
 local GodModeButton = Instance.new("TextButton")
-GodModeButton.Size = UDim2.new(0, 110, 0, 30)
-GodModeButton.Position = UDim2.new(1, -110, 0.5, -15)
+GodModeButton.Size = UDim2.new(0, 26, 0, 26)
+GodModeButton.Position = UDim2.new(1, -26, 0.5, -13)
 GodModeButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 GodModeButton.BorderSizePixel = 0
-GodModeButton.Text = "Click"
+GodModeButton.Text = "C"
 GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 GodModeButton.TextSize = 13
 GodModeButton.Font = Enum.Font.GothamBold
@@ -404,7 +492,7 @@ GodModeButton.AutoButtonColor = false
 GodModeButton.Parent = GodModeHolder
 
 local GodModeCorner = Instance.new("UICorner")
-GodModeCorner.CornerRadius = UDim.new(0, 8)
+GodModeCorner.CornerRadius = UDim.new(0, 6)
 GodModeCorner.Parent = GodModeButton
 
 local GodModeStroke = Instance.new("UIStroke")
@@ -429,10 +517,10 @@ _G.YOKUDO_SettingPage = SettingPage
 _G.YOKUDO_Features = {
     WalkSpeed = {
         Holder = WalkSpeedHolder,
-        Check = WalkSpeedCheck,
-        GetState = WalkSpeedGetState,
+        Check = WalkSpeedCheckButton,
+        GetState = function() return WalkSpeedEnabled end,
         TextBox = WalkSpeedTextBox,
-        GetValue = WalkSpeedGetValue
+        GetValue = function() return WalkSpeedValue end
     },
     BypassButton = BypassButton,
     AntiTrap = {
