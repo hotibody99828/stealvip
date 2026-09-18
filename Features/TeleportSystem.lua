@@ -1,7 +1,7 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
 -- Egg Collect + Fast Return to Safe
--- Fast Reset + Confirm Before Safe Zone
+-- Fast Reset + Heartbeat Confirm
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -37,12 +37,12 @@ local SAFE_LOCK_DISTANCE = 3
 
 local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 1
-local CONFIRM_WAIT = 0.5 -- ពេលវេលារង់ចាំដើម្បី Confirm មុន Fly to Safe
 
+-- CAMERA SETTINGS (Top-Down View)
 local CAMERA_HEIGHT = 3
 local CAMERA_DISTANCE = 0
-local CAMERA_ZOOM_STEP = 0.10
-local CAMERA_MIN_HEIGHT = 3
+local CAMERA_ZOOM_STEP = 0.5
+local CAMERA_MIN_HEIGHT = 2
 local LOCK_WAIT = 0.2
 
 local LOOP_INTERVAL = 0.02
@@ -67,8 +67,6 @@ local CollectDone = false
 local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
-local ConfirmingCollect = false
-local ConfirmStartTime = 0
 local OriginalCameraSubject = nil
 local CameraLocked = false
 
@@ -77,6 +75,7 @@ local BodyVelocity = nil
 local BodyGyro = nil
 local ActiveHeartbeat = nil
 local MainLoop = nil
+local ConfirmConnection = nil
 
 local SavedWalkSpeed = nil
 local SavedJumpPower = nil
@@ -147,7 +146,7 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG
+-- FIND EGG (Check ទាំង Container និង Workspace)
 -- ==================================================
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
@@ -258,7 +257,7 @@ local function ForceCameraToEgg(EggPos, Height)
     CameraLocked = true
 
     local H = Height or CAMERA_HEIGHT
-    local CamPos = EggPos + Vector3.new(0, H, CAMERA_DISTANCE)
+    local CamPos = EggPos + Vector3.new(0, H, 0)
 
     Camera.CFrame = CFrame.new(CamPos, EggPos)
     Camera.Focus = CFrame.new(EggPos)
@@ -437,12 +436,15 @@ local function FlyToSafeZone()
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
         -- ដល់ Safe Zone → Reset ភ្លាមៗ
         CurrentStep = "stop"
-        FullReset() -- Reset ភ្លាមៗ
+        
+        -- Reset State ភ្លាមៗ
+        FullReset()
     end)
 end
 
 -- ==================================================
 -- RESET STATE RETRY (Round #1 → Round #2)
+-- មិន Reset Camera ទេ - រក្សា Camera Lock ជាប់
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
@@ -462,7 +464,7 @@ local function ResetStateRetry()
 end
 
 -- ==================================================
--- FULL RESET (ភ្លាមៗ)
+-- FULL RESET (Fast)
 -- ==================================================
 local function FullReset()
     Running = false
@@ -478,8 +480,6 @@ local function FullReset()
     WaitingRetry = false
     RetryStartTime = 0
     GoingToSafe = false
-    ConfirmingCollect = false
-    ConfirmStartTime = 0
     CollectCount = 0
 
     CleanupMovers()
@@ -491,10 +491,65 @@ local function FullReset()
         MainLoop:Disconnect()
         MainLoop = nil
     end
+    if ConfirmConnection then
+        ConfirmConnection:Disconnect()
+        ConfirmConnection = nil
+    end
     ResetCamera()
     RestoreStats()
 
-    print("[YOKUDO] Full Reset - Fast")
+    print("[YOKUDO] Full Reset")
+end
+
+-- ==================================================
+-- FAST CONFIRM (Heartbeat Y Check)
+-- ==================================================
+local function StartFastConfirm()
+    if ConfirmConnection then
+        ConfirmConnection:Disconnect()
+        ConfirmConnection = nil
+    end
+
+    ConfirmConnection = RunService.Heartbeat:Connect(function()
+        if not Running then
+            if ConfirmConnection then
+                ConfirmConnection:Disconnect()
+                ConfirmConnection = nil
+            end
+            return
+        end
+
+        -- Check Y ភ្លាមៗ
+        local CurrentEgg = FindEggAnywhere()
+        local CurrentY = nil
+
+        if CurrentEgg then
+            CurrentY = GetEggY(CurrentEgg)
+        end
+
+        -- Confirm ពេល Y ដូរ
+        if SavedYBefore and CurrentY and not CollectDone then
+            if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
+                CollectDone = true
+                CollectCount = CollectCount + 1
+
+                -- បញ្ឈប់ Confirm
+                if ConfirmConnection then
+                    ConfirmConnection:Disconnect()
+                    ConfirmConnection = nil
+                end
+
+                if CollectCount >= COLLECT_TARGET then
+                    -- Done all → Fly Safe ភ្លាម
+                    FlyToSafeZone()
+                else
+                    -- Retry (Round #2)
+                    WaitingRetry = true
+                    RetryStartTime = tick()
+                end
+            end
+        end
+    end)
 end
 
 -- ==================================================
@@ -513,40 +568,7 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- ============================================
-        -- CONFIRM COLLECT (រង់ចាំ 0.5s មុន Fly to Safe)
-        -- ============================================
-        if ConfirmingCollect then
-            local Elapsed = tick() - ConfirmStartTime
-
-            if Elapsed >= CONFIRM_WAIT then
-                ConfirmingCollect = false
-                
-                -- Double Check ថាបាន Collect ពិតប្រាកដ
-                local CurrentEgg = FindEggAnywhere()
-                if CurrentEgg then
-                    local CurrentY = GetEggY(CurrentEgg)
-                    if SavedYBefore and CurrentY then
-                        if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
-                            -- Confirm បានពិត → Fly to Safe
-                            FlyToSafeZone()
-                        else
-                            -- មិនបាន → Retry
-                            WaitingRetry = true
-                            RetryStartTime = tick()
-                        end
-                    end
-                else
-                    -- Egg បាត់ → Confirm បាន
-                    FlyToSafeZone()
-                end
-            end
-            return
-        end
-
-        -- ============================================
         -- WAIT RETRY (2s before retry)
-        -- ============================================
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
@@ -561,36 +583,7 @@ local function StartActiveHeartbeat()
             return
         end
 
-        -- ============================================
-        -- FAST Y CHECK (Confirm Collect)
-        -- ============================================
-        local CurrentEgg = FindEggAnywhere()
-        local CurrentY = nil
-
-        if CurrentEgg then
-            CurrentY = GetEggY(CurrentEgg)
-        end
-
-        if SavedYBefore and CurrentY and not CollectDone then
-            if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
-                CollectDone = true
-                CollectCount = CollectCount + 1
-
-                if CollectCount >= COLLECT_TARGET then
-                    -- បានលើកទី 2 → Confirm មុន Fly to Safe
-                    ConfirmingCollect = true
-                    ConfirmStartTime = tick()
-                else
-                    -- Retry (Round #2)
-                    WaitingRetry = true
-                    RetryStartTime = tick()
-                end
-            end
-        end
-
-        -- ============================================
         -- LOCK + FACE + CAMERA + HOVER + PROMPT
-        -- ============================================
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -617,6 +610,8 @@ local function StartActiveHeartbeat()
                 local Y = GetEggY(TargetEgg)
                 if Y and not SavedYBefore then
                     SavedYBefore = Y
+                    -- ចាប់ផ្តើម Confirm ភ្លាម
+                    StartFastConfirm()
                 end
 
                 local Hover2 = FindHoverInTarget()
@@ -666,7 +661,6 @@ local function StartMainLoop()
 
         if WaitingRetry then return end
         if GoingToSafe then return end
-        if ConfirmingCollect then return end
 
         local CachedEgg = FindEggAnywhere()
 
@@ -706,7 +700,6 @@ local function Enable()
     TargetPromptPart = nil
     WaitingRetry = false
     GoingToSafe = false
-    ConfirmingCollect = false
     CollectCount = 0
     SaveStats()
 
@@ -717,8 +710,9 @@ local function Enable()
 end
 
 local function Disable()
+    -- Reset ភ្លាមៗ
     FullReset()
-    print("[YOKUDO] Teleport System: OFF")
+    print("[YOKUDO] Teleport System: OFF (Fast Reset)")
 end
 
 local function SetTargetId(Id)
@@ -740,7 +734,7 @@ local function GetState()
         Hover = TargetHover ~= nil,
         Prompt = TargetPromptPart ~= nil,
         CameraLocked = CameraLocked,
-        Confirming = ConfirmingCollect
+        CameraHeight = CurrentCameraHeight
     }
 end
 
@@ -757,4 +751,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Fast Reset + Confirm Before Safe)")
+print("✅ TeleportSystem Feature Loaded (Fast Reset + Heartbeat Confirm)")
