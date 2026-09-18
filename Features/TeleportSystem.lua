@@ -1,6 +1,7 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
 -- Egg Collect + Fast Return to Safe
+-- Camera Zoom Lock + Auto Loop
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -27,8 +28,8 @@ end)
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1000
-local RETURN_SPEED = 800
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -65,12 +66,16 @@ local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
 local OriginalCameraSubject = nil
+local CameraLocked = false
+local LoopAttempts = 0
+local MaxLoopAttempts = 10
 
 local FlyConnection = nil
 local BodyVelocity = nil
 local BodyGyro = nil
 local ActiveHeartbeat = nil
 local MainLoop = nil
+local CollectLoop = nil
 
 local SavedWalkSpeed = nil
 local SavedJumpPower = nil
@@ -146,13 +151,11 @@ end
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
     
-    -- Check Container មុន
     if Container then
         local Egg = Container:FindFirstChild(TARGET_ID)
         if Egg then return Egg end
     end
     
-    -- Check Workspace
     local Egg = workspace:FindFirstChild(TARGET_ID)
     if Egg then return Egg end
     
@@ -191,7 +194,6 @@ end
 local function FindHoverInTarget()
     if not TARGET_ID then return nil end
     
-    -- Check Container
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
@@ -200,7 +202,6 @@ local function FindHoverInTarget()
         end
     end
 
-    -- Check Workspace
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
         local Hover = WSEgg:FindFirstChild("AreaEggHover")
@@ -243,7 +244,7 @@ local function FindSmartPromptNearTarget(EggPos)
 end
 
 -- ==================================================
--- CAMERA FORCE
+-- CAMERA FORCE (LOCK)
 -- ==================================================
 local function ForceCameraToEgg(EggPos, Distance)
     if not Camera then return end
@@ -253,6 +254,7 @@ local function ForceCameraToEgg(EggPos, Distance)
     end
 
     Camera.CameraType = Enum.CameraType.Scriptable
+    CameraLocked = true
 
     local D = Distance or CAMERA_DISTANCE
     local CamPos = EggPos + Vector3.new(0, D * 0.5, D)
@@ -265,6 +267,7 @@ local function ResetCamera()
     if not Camera then return end
 
     Camera.CameraType = Enum.CameraType.Custom
+    CameraLocked = false
 
     local Hum, Root = GetHumanoid()
     if Hum then
@@ -295,13 +298,18 @@ end
 -- PROMPT TARGET
 -- ==================================================
 local function PromptTarget()
-    if not TargetPromptPart then return end
+    if not TargetPromptPart then return false end
+
+    local Fired = false
 
     if TargetPromptPart:IsA("ProximityPrompt") then
         pcall(function()
             fireproximityprompt(TargetPromptPart)
+            Fired = true
         end)
     end
+
+    return Fired
 end
 
 -- ==================================================
@@ -363,7 +371,6 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE then
                 CleanupMovers()
@@ -426,6 +433,7 @@ end
 local function FlyToSafeZone()
     GoingToSafe = true
     CurrentStep = "to_safe"
+    CameraLocked = false
     ResetCamera()
 
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
@@ -441,7 +449,7 @@ local function ResetStateRetry()
     TargetPromptPart = nil
     TargetHover = nil
     LockStartTime = 0
-    CurrentZoom = CAMERA_DISTANCE
+    -- CurrentZoom NOT Reset (Camera Zoom Lock)
     SavedYBefore = nil
     CollectDone = false
     WaitingRetry = false
@@ -449,7 +457,7 @@ local function ResetStateRetry()
     GoingToSafe = false
 
     CleanupMovers()
-    ResetCamera()
+    -- Camera NOT Reset (Camera Zoom Lock)
 
     CurrentStep = "idle"
     print("[YOKUDO] State Reset - Retry #" .. (CollectCount + 1))
@@ -473,6 +481,8 @@ local function FullReset()
     RetryStartTime = 0
     GoingToSafe = false
     CollectCount = 0
+    CameraLocked = false
+    LoopAttempts = 0
 
     CleanupMovers()
     if ActiveHeartbeat then
@@ -483,10 +493,104 @@ local function FullReset()
         MainLoop:Disconnect()
         MainLoop = nil
     end
+    if CollectLoop then
+        CollectLoop:Disconnect()
+        CollectLoop = nil
+    end
     ResetCamera()
     RestoreStats()
 
     print("[YOKUDO] Full Reset")
+end
+
+-- ==================================================
+-- COLLECT LOOP (Auto Loop Check + Collect + Confirm)
+-- ==================================================
+local function StartCollectLoop()
+    if CollectLoop then
+        CollectLoop:Disconnect()
+        CollectLoop = nil
+    end
+
+    CollectLoop = RunService.Heartbeat:Connect(function()
+        if not Running then return end
+        if CurrentStep ~= "lock_egg" then return end
+
+        local Hum, Root = GetHumanoid()
+        if not Hum or not Root then return end
+        if Hum.Health <= 0 then return end
+
+        if not TargetEgg then return end
+
+        local EggPos = GetEggPosition(TargetEgg)
+        if not EggPos then
+            CurrentStep = "idle"
+            TargetEgg = nil
+            return
+        end
+
+        -- Lock Position
+        Root.CFrame = CFrame.new(EggPos)
+        Root.AssemblyLinearVelocity = Vector3.zero
+        Root.AssemblyAngularVelocity = Vector3.zero
+
+        FaceEgg(EggPos)
+
+        -- Camera Lock (មិន Reset)
+        ForceCameraToEgg(EggPos, CurrentZoom)
+
+        local Elapsed = tick() - LockStartTime
+
+        if Elapsed >= LOCK_WAIT then
+            local Y = GetEggY(TargetEgg)
+            if Y and not SavedYBefore then
+                SavedYBefore = Y
+            end
+
+            local Hover2 = FindHoverInTarget()
+
+            if Hover2 then
+                TargetHover = Hover2
+
+                if not TargetPromptPart then
+                    TargetPromptPart = FindSmartPromptNearTarget(EggPos)
+                end
+
+                if TargetPromptPart then
+                    PromptTarget()
+
+                    -- Confirm Collect (Y Change)
+                    local NewY = GetEggY(TargetEgg)
+                    if SavedYBefore and NewY and not CollectDone then
+                        if NewY - SavedYBefore >= Y_CHANGE_THRESHOLD then
+                            CollectDone = true
+                            CollectCount = CollectCount + 1
+
+                            if CollectCount >= COLLECT_TARGET then
+                                FlyToSafeZone()
+                            else
+                                WaitingRetry = true
+                                RetryStartTime = tick()
+                            end
+                        end
+                    end
+                end
+            else
+                -- Zoom In (មិន Reset)
+                CurrentZoom = CurrentZoom - CAMERA_ZOOM_STEP
+                if CurrentZoom < CAMERA_MIN_DISTANCE then
+                    CurrentZoom = CAMERA_MIN_DISTANCE
+                end
+            end
+        end
+
+        -- Auto Loop Limit
+        LoopAttempts = LoopAttempts + 1
+        if LoopAttempts > MaxLoopAttempts then
+            print("[YOKUDO] Max Loop Attempts Reached")
+            ResetStateRetry()
+        end
+    end)
 end
 
 -- ==================================================
@@ -505,54 +609,22 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- ============================================
-        -- WAIT RETRY (2s before retry)
-        -- ============================================
+        -- WAIT RETRY
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
             if Elapsed >= RETRY_WAIT then
                 if CollectCount >= COLLECT_TARGET then
-                    -- Done all -> Fly to Safe
                     WaitingRetry = false
                     FlyToSafeZone()
                 else
-                    -- Retry (Round #2)
                     ResetStateRetry()
                 end
             end
             return
         end
 
-        -- ============================================
-        -- FAST Y CHECK (Confirm Collect)
-        -- ============================================
-        local CurrentEgg = FindEggAnywhere()
-        local CurrentY = nil
-
-        if CurrentEgg then
-            CurrentY = GetEggY(CurrentEgg)
-        end
-
-        if SavedYBefore and CurrentY and not CollectDone then
-            if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
-                CollectDone = true
-                CollectCount = CollectCount + 1
-
-                if CollectCount >= COLLECT_TARGET then
-                    -- Done all -> Fly Safe IMMEDIATELY
-                    FlyToSafeZone()
-                else
-                    -- Retry (Round #2)
-                    WaitingRetry = true
-                    RetryStartTime = tick()
-                end
-            end
-        end
-
-        -- ============================================
         -- LOCK + FACE + CAMERA + HOVER + PROMPT
-        -- ============================================
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -572,34 +644,6 @@ local function StartActiveHeartbeat()
 
             FaceEgg(EggPos)
             ForceCameraToEgg(EggPos, CurrentZoom)
-
-            local Elapsed = tick() - LockStartTime
-
-            if Elapsed >= LOCK_WAIT then
-                local Y = GetEggY(TargetEgg)
-                if Y and not SavedYBefore then
-                    SavedYBefore = Y
-                end
-
-                local Hover2 = FindHoverInTarget()
-
-                if Hover2 then
-                    TargetHover = Hover2
-
-                    if not TargetPromptPart then
-                        TargetPromptPart = FindSmartPromptNearTarget(EggPos)
-                    end
-
-                    if TargetPromptPart then
-                        PromptTarget()
-                    end
-                else
-                    CurrentZoom = CurrentZoom - CAMERA_ZOOM_STEP
-                    if CurrentZoom < CAMERA_MIN_DISTANCE then
-                        CurrentZoom = CAMERA_MIN_DISTANCE
-                    end
-                end
-            end
 
         elseif CurrentStep == "to_safe" then
             -- Handled by FlyToSafeZone
@@ -629,7 +673,6 @@ local function StartMainLoop()
         if WaitingRetry then return end
         if GoingToSafe then return end
 
-        -- Check Egg ទាំង Container និង Workspace
         local CachedEgg = FindEggAnywhere()
 
         if CurrentStep == "idle" and CachedEgg then
@@ -638,9 +681,10 @@ local function StartMainLoop()
                 local Dist = GetEggDistance(CachedEgg)
                 if Dist > MIN_FLY_DISTANCE then
                     TargetEgg = CachedEgg
-                    CurrentZoom = CAMERA_DISTANCE
+                    -- CurrentZoom NOT Reset (Camera Zoom Lock)
                     TargetPromptPart = nil
                     SavedYBefore = nil
+                    LoopAttempts = 0
 
                     CurrentStep = "to_egg"
 
@@ -670,10 +714,12 @@ local function Enable()
     WaitingRetry = false
     GoingToSafe = false
     CollectCount = 0
+    LoopAttempts = 0
     SaveStats()
 
     StartActiveHeartbeat()
     StartMainLoop()
+    StartCollectLoop()
 
     print("[YOKUDO] Teleport System: ON")
 end
@@ -700,7 +746,9 @@ local function GetState()
         CollectCount = CollectCount,
         TargetId = TARGET_ID,
         Hover = TargetHover ~= nil,
-        Prompt = TargetPromptPart ~= nil
+        Prompt = TargetPromptPart ~= nil,
+        CameraLocked = CameraLocked,
+        CurrentZoom = CurrentZoom
     }
 end
 
@@ -717,4 +765,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded")
+print("✅ TeleportSystem Feature Loaded (Camera Lock + Auto Loop)")
