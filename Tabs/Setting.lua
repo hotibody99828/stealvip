@@ -206,7 +206,7 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 3: GOD MODE
+-- FEATURE 3: GOD MODE (BUTTON)
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -259,14 +259,35 @@ GodModeStroke.Thickness = 1.5
 GodModeStroke.Transparency = 0.3
 GodModeStroke.Parent = GodModeButton
 
+-- បន្ថែម Animation
+GodModeButton.MouseEnter:Connect(function()
+    TweenService:Create(GodModeButton, TweenInfo.new(0.15), {
+        BackgroundColor3 = Color3.fromRGB(125, 110, 220)
+    }):Play()
+end)
+
+GodModeButton.MouseLeave:Connect(function()
+    TweenService:Create(GodModeButton, TweenInfo.new(0.15), {
+        BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+    }):Play()
+end)
+
+GodModeButton.MouseButton1Down:Connect(function()
+    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
+        BackgroundColor3 = Color3.fromRGB(85, 70, 170)
+    }):Play()
+end)
+
+GodModeButton.MouseButton1Up:Connect(function()
+    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
+        BackgroundColor3 = Color3.fromRGB(125, 110, 220)
+    }):Play()
+end)
+
+-- ពេល Click → គ្រាន់តែ Start God Mode មួយដង (បាត់ Toggle, បាត់ ON)
 GodModeButton.MouseButton1Click:Connect(function()
     if _G.YOKUDO_GodMode then
-        _G.YOKUDO_GodMode.Toggle()
-        if _G.YOKUDO_GodMode.IsEnabled() then
-            GodModeButton.Text = "ON"
-        else
-            GodModeButton.Text = "Click"
-        end
+        _G.YOKUDO_GodMode.Enable()
     end
 end)
 
