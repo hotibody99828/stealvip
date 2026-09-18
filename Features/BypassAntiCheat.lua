@@ -1,16 +1,9 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Bypass Anti Cheat
--- Humanoid Replace + Anti Death + Instant Prompts
+-- Humanoid Replace + Anti Death
 -- ==================================================
 
---==================================================
--- YOKUDO HUB + INSTANT PROXIMITY PROMPTS
--- HUMANOID ONLY REPLACE + DEFAULT JUMP FIX
--- + ANTI DEATH + PROMPT HOLD = 0
---==================================================
-
 local Players = game:GetService("Players")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
@@ -31,14 +24,6 @@ print("========================================")
 --==================================================
 
 local GodMode = true
-
---==================================================
--- INSTANT PROXIMITY PROMPTS
---==================================================
-
-ProximityPromptService.PromptShown:Connect(function(prompt)
-    prompt.HoldDuration = 0
-end)
 
 --==================================================
 -- SAVE JUMP PROPERTIES
@@ -514,7 +499,7 @@ local FinalHumanoid =
 
 print("")
 print("========================================")
-print("[YOKUDO] HUMANOID REPLACE + ANTI DEATH + INSTANT PROMPTS COMPLETE")
+print("[YOKUDO] HUMANOID REPLACE + ANTI DEATH COMPLETE")
 print("========================================")
 
 print("Humanoid :", FinalHumanoid)
