@@ -406,7 +406,7 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 3: GOD MODE (BUTTON)
+-- FEATURE 3: GOD MODE (BUTTON) - LINKED
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -464,6 +464,11 @@ AddButtonAnimation(GodModeButton)
 GodModeButton.MouseButton1Click:Connect(function()
     if _G.YOKUDO_GodMode then
         _G.YOKUDO_GodMode.Toggle()
+        if _G.YOKUDO_GodMode.IsEnabled() then
+            GodModeButton.Text = "ON"
+        else
+            GodModeButton.Text = "Click"
+        end
     end
 end)
 
