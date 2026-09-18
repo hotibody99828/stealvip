@@ -1,6 +1,6 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Auto Attack
--- Auto Equip Bat + Auto Hit Player (Remote)
+-- Auto Equip Bat + Auto Fire Remote
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -13,32 +13,28 @@ local Backpack = Player:WaitForChild("Backpack")
 -- ==================================================
 -- FIND REMOTE
 -- ==================================================
+local BatSwingRemote = nil
+
 local function GetBatSwingRemote()
+    if BatSwingRemote then return BatSwingRemote end
+    
+    -- ពិនិត្យ ReplicatedStorage.Shared.Remotes.BatSwing.Trigger
     local Success, Remote = pcall(function()
-        local Remotes = ReplicatedStorage:FindFirstChild("Shared")
-        if Remotes then
-            Remotes = Remotes:FindFirstChild("Remotes")
-        end
-        if Remotes then
-            Remotes = Remotes:FindFirstChild("BatSwing")
-        end
-        if Remotes then
-            Remotes = Remotes:FindFirstChild("Trigger")
-        end
-        return Remotes
+        return ReplicatedStorage.Shared.Remotes.BatSwing.Trigger
     end)
     
     if Success and Remote then
+        BatSwingRemote = Remote
         return Remote
     end
     
     -- ស្វែងរកទូទៅ
     for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
-        if v.Name == "BatSwing" and v:IsA("RemoteEvent") then
-            return v
-        end
-        if v.Name == "Trigger" and v.Parent and v.Parent.Name == "BatSwing" then
-            return v
+        if v.Name == "Trigger" and v:IsA("RemoteEvent") then
+            if v.Parent and v.Parent.Name == "BatSwing" then
+                BatSwingRemote = v
+                return v
+            end
         end
     end
     
@@ -49,7 +45,7 @@ end
 -- SETTINGS
 -- ==================================================
 local HIT_RANGE = 50
-local SWING_INTERVAL = 0.5
+local SWING_INTERVAL = 0.1 -- លឿនបំផុត
 
 -- ==================================================
 -- STATE
@@ -167,7 +163,7 @@ local function ToggleAutoEquip()
 end
 
 -- ==================================================
--- FEATURE 2: AUTO HIT PLAYER (Remote)
+-- FEATURE 2: AUTO FIRE REMOTE (ចំ Detection Humanoid)
 -- ==================================================
 local function FindClosestPlayer()
     local Hum, Root = GetHumanoid()
@@ -183,6 +179,7 @@ local function FindClosestPlayer()
                 local otherHum = otherChar:FindFirstChildOfClass("Humanoid")
                 local otherRoot = otherChar:FindFirstChild("HumanoidRootPart")
                 if otherHum and otherRoot and otherHum.Health > 0 then
+                    -- ចំ Detection Humanoid (HumanoidRootPart)
                     local Dist = (otherRoot.Position - Root.Position).Magnitude
                     if Dist < ClosestDist then
                         ClosestDist = Dist
@@ -196,42 +193,22 @@ local function FindClosestPlayer()
     return Closest
 end
 
-local function HitPlayer()
-    if not CurrentBat then
-        CurrentBat = FindBatTool()
-        if not CurrentBat then return end
-    end
-    
+local function FireRemote()
+    -- រក Target (Player ក្នុង Range 50)
     local Target = FindClosestPlayer()
+    if not Target then return end
     
-    -- Face Target
-    local Hum, Root = GetHumanoid()
-    if Root and Target and Target.Character then
-        local TargetRoot = Target.Character:FindFirstChild("HumanoidRootPart")
-        if TargetRoot then
-            local Direction = (TargetRoot.Position - Root.Position)
-            local FlatDir = Vector3.new(Direction.X, 0, Direction.Z)
-            if FlatDir.Magnitude > 0.1 then
-                Root.CFrame = CFrame.new(Root.Position, Root.Position + FlatDir.Unit)
-            end
-        end
-    end
-    
-    -- ប្រើ Remote
+    -- រក Remote
     local Remote = GetBatSwingRemote()
-    if Remote then
-        TraceSequence = TraceSequence + 1
-        local TraceId = tostring(Player.UserId) .. ":" .. tostring(TraceSequence) .. ":" .. tostring(math.floor(workspace:GetServerTimeNow() * 1000))
-        
-        pcall(function()
-            Remote:FireServer(Target, TraceId)
-        end)
-    else
-        -- Fallback ទៅ Activate
-        pcall(function()
-            CurrentBat:Activate()
-        end)
-    end
+    if not Remote then return end
+    
+    -- Fire ភ្លាមៗ (មិន Aim, មិន Click)
+    TraceSequence = TraceSequence + 1
+    local TraceId = tostring(Player.UserId) .. ":" .. tostring(TraceSequence) .. ":" .. tostring(math.floor(workspace:GetServerTimeNow() * 1000))
+    
+    pcall(function()
+        Remote:FireServer(Target, TraceId)
+    end)
 end
 
 local function EnableAutoHit()
@@ -250,10 +227,10 @@ local function EnableAutoHit()
         if now - LastSwing < SWING_INTERVAL then return end
         LastSwing = now
         
-        HitPlayer()
+        FireRemote()
     end)
     
-    print("[YOKUDO] Auto Hit Player (Remote): ON")
+    print("[YOKUDO] Auto Fire Remote: ON")
 end
 
 local function DisableAutoHit()
@@ -265,7 +242,7 @@ local function DisableAutoHit()
         HitConnection = nil
     end
     
-    print("[YOKUDO] Auto Hit Player: OFF")
+    print("[YOKUDO] Auto Fire Remote: OFF")
 end
 
 local function ToggleAutoHit()
@@ -296,7 +273,7 @@ _G.YOKUDO_AutoAttack = {
     DisableAutoEquip = DisableAutoEquip,
     IsAutoEquipEnabled = function() return AutoEquipEnabled end,
     
-    -- Auto Hit
+    -- Auto Fire Remote
     ToggleAutoHit = ToggleAutoHit,
     EnableAutoHit = EnableAutoHit,
     DisableAutoHit = DisableAutoHit,
@@ -304,7 +281,8 @@ _G.YOKUDO_AutoAttack = {
     
     -- Utils
     FindBatTool = FindBatTool,
-    GetBatSwingRemote = GetBatSwingRemote
+    GetBatSwingRemote = GetBatSwingRemote,
+    FindClosestPlayer = FindClosestPlayer
 }
 
-print("✅ AutoAttack Feature Loaded (Remote)")
+print("✅ AutoAttack Feature Loaded (Fire Remote Only)")
