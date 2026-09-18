@@ -39,7 +39,7 @@ local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 1
 local CONFIRM_WAIT = 0.5 -- ពេលវេលារង់ចាំដើម្បី Confirm មុន Fly to Safe
 
-local CAMERA_HEIGHT = 8
+local CAMERA_HEIGHT = 3
 local CAMERA_DISTANCE = 0
 local CAMERA_ZOOM_STEP = 0.5
 local CAMERA_MIN_HEIGHT = 3
