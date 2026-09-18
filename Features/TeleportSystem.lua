@@ -1,6 +1,7 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
 -- Egg Collect + Fast Return to Safe
+-- Mobile Fix - Force Collect
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -40,7 +41,9 @@ local Y_CHANGE_THRESHOLD = 1
 local CAMERA_DISTANCE = 1.5
 local CAMERA_ZOOM_STEP = 0.3
 local CAMERA_MIN_DISTANCE = 1.0
-local LOCK_WAIT = 0.2
+local LOCK_WAIT = 0.3
+local COLLECT_WAIT = 0.5  -- រង់ចាំ 0.5s មុនពេល Fire Prompt
+local PROMPT_INTERVAL = 0.1  -- Fire Prompt រាល់ 0.1s
 
 local LOOP_INTERVAL = 0.02
 local RETRY_WAIT = 2
@@ -65,6 +68,7 @@ local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
 local OriginalCameraSubject = nil
+local LastPromptFire = 0
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -141,7 +145,7 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG (Check ទាំង Container និង Workspace)
+-- FIND EGG
 -- ==================================================
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
@@ -184,7 +188,7 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER IN TARGET
+-- HOVER
 -- ==================================================
 local function FindHoverInTarget()
     if not TARGET_ID then return nil end
@@ -288,7 +292,7 @@ local function FaceEgg(EggPos)
 end
 
 -- ==================================================
--- PROMPT TARGET
+-- PROMPT TARGET (Fire ច្រើនដងសម្រាប់ Mobile)
 -- ==================================================
 local function PromptTarget()
     if not TargetPromptPart then return end
@@ -423,7 +427,7 @@ local function FlyToSafeZone()
 end
 
 -- ==================================================
--- RESET STATE RETRY (Round #1 → Round #2)
+-- RESET STATE RETRY
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
@@ -435,7 +439,6 @@ local function ResetStateRetry()
     RetryStartTime = 0
     GoingToSafe = false
 
-    -- Reset សម្រាប់ Round ថ្មី
     SavedYBefore = nil
     CollectDone = false
 
@@ -496,9 +499,7 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- ============================================
-        -- WAIT RETRY (2s before retry)
-        -- ============================================
+        -- WAIT RETRY
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
@@ -513,9 +514,7 @@ local function StartActiveHeartbeat()
             return
         end
 
-        -- ============================================
-        -- FAST Y CHECK (Confirm Collect)
-        -- ============================================
+        -- FAST Y CHECK
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
@@ -537,9 +536,7 @@ local function StartActiveHeartbeat()
             end
         end
 
-        -- ============================================
-        -- LOCK + FACE + CAMERA + HOVER + PROMPT
-        -- ============================================
+        -- LOCK + FACE + CAMERA + HOVER + PROMPT (MOBILE FIX)
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -577,7 +574,10 @@ local function StartActiveHeartbeat()
                         TargetPromptPart = FindSmartPromptNearTarget(EggPos)
                     end
 
-                    if TargetPromptPart then
+                    -- Fire Prompt រាល់ 0.1s សម្រាប់ Mobile
+                    local now = tick()
+                    if TargetPromptPart and now - LastPromptFire >= PROMPT_INTERVAL then
+                        LastPromptFire = now
                         PromptTarget()
                     end
                 else
@@ -598,7 +598,7 @@ local function StartActiveHeartbeat()
 end
 
 -- ==================================================
--- MAIN LOOP (Check Egg → Fly TP)
+-- MAIN LOOP
 -- ==================================================
 local function StartMainLoop()
     if MainLoop then
@@ -691,4 +691,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded")
+print("✅ TeleportSystem Feature Loaded (Mobile Force Collect)")
