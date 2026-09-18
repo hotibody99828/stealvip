@@ -31,7 +31,6 @@ local FLY_SPEED = 1000
 local RETURN_SPEED = 500
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
-local PROMPT_RANGE = 8
 local ARRIVE_DISTANCE = 2
 local SAFE_LOCK_DISTANCE = 3
 
@@ -66,6 +65,7 @@ local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
 local OriginalCameraSubject = nil
+local LastPromptFire = 0
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -142,16 +142,22 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG
+-- FIND EGG (Check ទាំង Container និង Workspace)
 -- ==================================================
-local function FindEggInContainer()
-    if not Container or not TARGET_ID then return nil end
-    return Container:FindFirstChild(TARGET_ID)
-end
-
-local function FindEggInWorkspace()
+local function FindEggAnywhere()
     if not TARGET_ID then return nil end
-    return workspace:FindFirstChild(TARGET_ID)
+    
+    -- Check Container មុន
+    if Container then
+        local Egg = Container:FindFirstChild(TARGET_ID)
+        if Egg then return Egg, "container" end
+    end
+    
+    -- Check Workspace
+    local Egg = workspace:FindFirstChild(TARGET_ID)
+    if Egg then return Egg, "workspace" end
+    
+    return nil, nil
 end
 
 local function GetEggPosition(Egg)
@@ -181,23 +187,25 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER IN TARGET
+-- HOVER IN TARGET (Check ទាំង Container និង Workspace)
 -- ==================================================
 local function FindHoverInTarget()
     if not TARGET_ID then return nil, nil end
     
+    -- Check Container
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
             local Hover = Slot:FindFirstChild("AreaEggHover")
-            if Hover then return Hover, "target-spawn" end
+            if Hover then return Hover, "container" end
         end
     end
 
+    -- Check Workspace
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
         local Hover = WSEgg:FindFirstChild("AreaEggHover")
-        if Hover then return Hover, "target-ws" end
+        if Hover then return Hover, "workspace" end
     end
 
     return nil, nil
@@ -285,10 +293,14 @@ local function FaceEgg(EggPos)
 end
 
 -- ==================================================
--- PROMPT TARGET
+-- PROMPT TARGET (Fire ភ្លាម ពេលឃើញ Hover)
 -- ==================================================
 local function PromptTarget()
     if not TargetPromptPart then return 0 end
+    
+    local now = tick()
+    if now - LastPromptFire < 0.1 then return 0 end
+    LastPromptFire = now
 
     local Count = 0
 
@@ -520,7 +532,7 @@ local function StartActiveHeartbeat()
         end
 
         -- FAST Y CHECK (Confirm)
-        local CurrentEgg = workspace:FindFirstChild(TARGET_ID) or (Container and Container:FindFirstChild(TARGET_ID))
+        local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
         if CurrentEgg then
@@ -574,7 +586,7 @@ local function StartActiveHeartbeat()
 
                 if Hover2 then
                     TargetHover = Hover2
-
+                    -- Fire Prompt ភ្លាម ពេលឃើញ Hover
                     if not TargetPromptPart then
                         TargetPromptPart = FindSmartPromptNearTarget(EggPos)
                     end
@@ -618,47 +630,25 @@ local function StartMainLoop()
         if WaitingRetry then return end
         if GoingToSafe then return end
 
-        local CachedSpawnEgg = FindEggInContainer()
-        local CachedWSEgg = FindEggInWorkspace()
+        -- Check Egg ទាំង Container និង Workspace
+        local CachedEgg, EggSource = FindEggAnywhere()
 
-        local CurrentEgg = CachedWSEgg or CachedSpawnEgg
+        if CurrentStep == "idle" and CachedEgg then
+            local EggPos = GetEggPosition(CachedEgg)
+            if EggPos then
+                local Dist = GetEggDistance(CachedEgg)
+                if Dist > MIN_FLY_DISTANCE then
+                    TargetEgg = CachedEgg
+                    CurrentZoom = CAMERA_DISTANCE
+                    TargetPromptPart = nil
+                    SavedYBefore = nil
 
-        if CurrentStep == "idle" then
-            if CachedWSEgg then
-                local EggPos = GetEggPosition(CachedWSEgg)
-                if EggPos then
-                    local Dist = GetEggDistance(CachedWSEgg)
-                    if Dist > MIN_FLY_DISTANCE then
-                        TargetEgg = CachedWSEgg
-                        CurrentZoom = CAMERA_DISTANCE
-                        TargetPromptPart = nil
-                        SavedYBefore = nil
+                    CurrentStep = "to_egg"
 
-                        CurrentStep = "to_egg"
-
-                        FlyTP(EggPos, FLY_SPEED, true, function()
-                            LockStartTime = tick()
-                            CurrentStep = "lock_egg"
-                        end)
-                    end
-                end
-            elseif CachedSpawnEgg then
-                local EggPos = GetEggPosition(CachedSpawnEgg)
-                if EggPos then
-                    local Dist = GetEggDistance(CachedSpawnEgg)
-                    if Dist > MIN_FLY_DISTANCE then
-                        TargetEgg = CachedSpawnEgg
-                        CurrentZoom = CAMERA_DISTANCE
-                        TargetPromptPart = nil
-                        SavedYBefore = nil
-
-                        CurrentStep = "to_egg"
-
-                        FlyTP(EggPos, FLY_SPEED, true, function()
-                            LockStartTime = tick()
-                            CurrentStep = "lock_egg"
-                        end)
-                    end
+                    FlyTP(EggPos, FLY_SPEED, true, function()
+                        LockStartTime = tick()
+                        CurrentStep = "lock_egg"
+                    end)
                 end
             end
         end
