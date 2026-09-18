@@ -385,17 +385,6 @@ local function ToggleGodMode()
 end
 
 -- ==================================================
--- AUTO RE-RUN ON CHARACTER ADDED
--- ==================================================
-Player.CharacterAdded:Connect(function()
-    if GodModeEnabled then
-        task.wait(2)
-        RunBypassAntiCheat()
-        print("[YOKUDO] God Mode: Re-applied on new Character")
-    end
-end)
-
--- ==================================================
 -- EXPORT
 -- ==================================================
 _G.YOKUDO_GodMode = {
