@@ -1,211 +1,4 @@
 -- ==================================================
--- YOKUDO HUB | TAB | Setting
--- ==================================================
-
-local TabsManager = _G.YOKUDO_TabsManager
-
-local SettingTab, SettingPage = TabsManager:RegisterTab("Setting", 7, "SETTING")
-
--- ==================================================
--- SETTING CONTENT
--- ==================================================
-CreateSectionTitle(SettingPage, "Settings", 1)
-
--- ==================================================
--- FEATURE 1: WALK SPEED
--- ==================================================
-local WalkSpeedHolder = Instance.new("Frame")
-WalkSpeedHolder.Size = UDim2.new(1, 0, 0, 32)
-WalkSpeedHolder.BackgroundTransparency = 1
-WalkSpeedHolder.LayoutOrder = 2
-WalkSpeedHolder.Parent = SettingPage
-
-local WalkSpeedLabel = Instance.new("TextLabel")
-WalkSpeedLabel.Size = UDim2.new(0, 100, 1, 0)
-WalkSpeedLabel.BackgroundTransparency = 1
-WalkSpeedLabel.Text = "Walk Speed"
-WalkSpeedLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
-WalkSpeedLabel.TextSize = 12
-WalkSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-WalkSpeedLabel.TextYAlignment = Enum.TextYAlignment.Center
-WalkSpeedLabel.Font = Enum.Font.GothamMedium
-WalkSpeedLabel.Parent = WalkSpeedHolder
-
-local WalkSpeedTextBox = Instance.new("TextBox")
-WalkSpeedTextBox.Size = UDim2.new(0, 40, 1, -6)
-WalkSpeedTextBox.Position = UDim2.new(0, 105, 0, 3)
-WalkSpeedTextBox.BackgroundColor3 = Color3.fromRGB(30, 31, 45)
-WalkSpeedTextBox.BorderSizePixel = 0
-WalkSpeedTextBox.Text = "50"
-WalkSpeedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-WalkSpeedTextBox.TextSize = 12
-WalkSpeedTextBox.TextXAlignment = Enum.TextXAlignment.Center
-WalkSpeedTextBox.TextYAlignment = Enum.TextYAlignment.Center
-WalkSpeedTextBox.Font = Enum.Font.GothamMedium
-WalkSpeedTextBox.Parent = WalkSpeedHolder
-
-local WalkSpeedBoxCorner = Instance.new("UICorner")
-WalkSpeedBoxCorner.CornerRadius = UDim.new(0, 4)
-WalkSpeedBoxCorner.Parent = WalkSpeedTextBox
-
-local WalkSpeedBoxStroke = Instance.new("UIStroke")
-WalkSpeedBoxStroke.Color = Color3.fromRGB(200, 200, 220)
-WalkSpeedBoxStroke.Thickness = 0.5
-WalkSpeedBoxStroke.Transparency = 0.2
-WalkSpeedBoxStroke.Parent = WalkSpeedTextBox
-
-local WalkSpeedCheckButton = Instance.new("TextButton")
-WalkSpeedCheckButton.Size = UDim2.new(0, 26, 0, 26)
-WalkSpeedCheckButton.Position = UDim2.new(1, -26, 0.5, -13)
-WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-WalkSpeedCheckButton.BorderSizePixel = 0
-WalkSpeedCheckButton.Text = ""
-WalkSpeedCheckButton.AutoButtonColor = false
-WalkSpeedCheckButton.Parent = WalkSpeedHolder
-
-local WalkSpeedCorner = Instance.new("UICorner")
-WalkSpeedCorner.CornerRadius = UDim.new(0, 6)
-WalkSpeedCorner.Parent = WalkSpeedCheckButton
-
-local WalkSpeedStroke = Instance.new("UIStroke")
-WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
-WalkSpeedStroke.Thickness = 1.5
-WalkSpeedStroke.Parent = WalkSpeedCheckButton
-
-local WalkSpeedCheck = Instance.new("TextLabel")
-WalkSpeedCheck.Size = UDim2.new(1, 0, 1, 0)
-WalkSpeedCheck.BackgroundTransparency = 1
-WalkSpeedCheck.Text = "✓"
-WalkSpeedCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
-WalkSpeedCheck.TextSize = 18
-WalkSpeedCheck.Font = Enum.Font.GothamBold
-WalkSpeedCheck.Visible = false
-WalkSpeedCheck.Parent = WalkSpeedCheckButton
-
-local WalkSpeedEnabled = false
-local WalkSpeedValue = 50
-
-local function ToggleWalkSpeed()
-    WalkSpeedEnabled = not WalkSpeedEnabled
-    WalkSpeedCheck.Visible = WalkSpeedEnabled
-    if WalkSpeedEnabled then
-        WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-        WalkSpeedStroke.Color = Color3.fromRGB(135, 120, 225)
-        if _G.YOKUDO_WalkSpeed then
-            _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
-            _G.YOKUDO_WalkSpeed.Enable()
-        end
-    else
-        WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-        WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
-        if _G.YOKUDO_WalkSpeed then
-            _G.YOKUDO_WalkSpeed.Disable()
-        end
-    end
-end
-
-WalkSpeedCheckButton.MouseButton1Click:Connect(function()
-    ToggleWalkSpeed()
-end)
-
-WalkSpeedTextBox.FocusLost:Connect(function()
-    local val = tonumber(WalkSpeedTextBox.Text)
-    if val then
-        WalkSpeedValue = math.clamp(val, 50, 1000)
-        WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
-        if WalkSpeedEnabled and _G.YOKUDO_WalkSpeed then
-            _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
-        end
-    else
-        WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
-    end
-end)
-
--- ==================================================
--- FEATURE 2: ANTI TRAP
--- ==================================================
-local AntiTrapHolder = Instance.new("Frame")
-AntiTrapHolder.Size = UDim2.new(1, 0, 0, 52)
-AntiTrapHolder.BackgroundTransparency = 1
-AntiTrapHolder.LayoutOrder = 3
-AntiTrapHolder.Parent = SettingPage
-
-local AntiTrapLabel = Instance.new("TextLabel")
-AntiTrapLabel.Size = UDim2.new(1, -50, 0, 20)
-AntiTrapLabel.Position = UDim2.new(0, 0, 0, 2)
-AntiTrapLabel.BackgroundTransparency = 1
-AntiTrapLabel.Text = "Anti Trap"
-AntiTrapLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
-AntiTrapLabel.TextSize = 13
-AntiTrapLabel.TextXAlignment = Enum.TextXAlignment.Left
-AntiTrapLabel.TextYAlignment = Enum.TextYAlignment.Center
-AntiTrapLabel.Font = Enum.Font.GothamBold
-AntiTrapLabel.Parent = AntiTrapHolder
-
-local AntiTrapTitle = Instance.new("TextLabel")
-AntiTrapTitle.Size = UDim2.new(1, -50, 0, 18)
-AntiTrapTitle.Position = UDim2.new(0, 0, 0, 24)
-AntiTrapTitle.BackgroundTransparency = 1
-AntiTrapTitle.Text = "click for remove Trap"
-AntiTrapTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
-AntiTrapTitle.TextSize = 10
-AntiTrapTitle.TextXAlignment = Enum.TextXAlignment.Left
-AntiTrapTitle.Font = Enum.Font.Gotham
-AntiTrapTitle.Parent = AntiTrapHolder
-
-local AntiTrapCheckButton = Instance.new("TextButton")
-AntiTrapCheckButton.Size = UDim2.new(0, 26, 0, 26)
-AntiTrapCheckButton.Position = UDim2.new(1, -26, 0.5, -13)
-AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-AntiTrapCheckButton.BorderSizePixel = 0
-AntiTrapCheckButton.Text = ""
-AntiTrapCheckButton.AutoButtonColor = false
-AntiTrapCheckButton.Parent = AntiTrapHolder
-
-local AntiTrapCorner = Instance.new("UICorner")
-AntiTrapCorner.CornerRadius = UDim.new(0, 6)
-AntiTrapCorner.Parent = AntiTrapCheckButton
-
-local AntiTrapStroke = Instance.new("UIStroke")
-AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
-AntiTrapStroke.Thickness = 1.5
-AntiTrapStroke.Parent = AntiTrapCheckButton
-
-local AntiTrapCheck = Instance.new("TextLabel")
-AntiTrapCheck.Size = UDim2.new(1, 0, 1, 0)
-AntiTrapCheck.BackgroundTransparency = 1
-AntiTrapCheck.Text = "✓"
-AntiTrapCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
-AntiTrapCheck.TextSize = 18
-AntiTrapCheck.Font = Enum.Font.GothamBold
-AntiTrapCheck.Visible = false
-AntiTrapCheck.Parent = AntiTrapCheckButton
-
-local AntiTrapEnabled = false
-
-local function ToggleAntiTrap()
-    AntiTrapEnabled = not AntiTrapEnabled
-    AntiTrapCheck.Visible = AntiTrapEnabled
-    if AntiTrapEnabled then
-        AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-        AntiTrapStroke.Color = Color3.fromRGB(135, 120, 225)
-        if _G.YOKUDO_AntiTrap then
-            _G.YOKUDO_AntiTrap.Enable()
-        end
-    else
-        AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-        AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
-        if _G.YOKUDO_AntiTrap then
-            _G.YOKUDO_AntiTrap.Disable()
-        end
-    end
-end
-
-AntiTrapCheckButton.MouseButton1Click:Connect(function()
-    ToggleAntiTrap()
-end)
-
--- ==================================================
 -- FEATURE 3: GOD MODE (BUTTON)
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
@@ -247,6 +40,7 @@ GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 GodModeButton.TextSize = 12
 GodModeButton.Font = Enum.Font.GothamBold
 GodModeButton.AutoButtonColor = false
+GodModeButton.ClipsDescendants = true -- សម្រាប់ Animation
 GodModeButton.Parent = GodModeHolder
 
 local GodModeCorner = Instance.new("UICorner")
@@ -259,7 +53,26 @@ GodModeStroke.Thickness = 1.5
 GodModeStroke.Transparency = 0.3
 GodModeStroke.Parent = GodModeButton
 
--- បន្ថែម Animation
+-- ==================================================
+-- ANIMATION FRAME (រត់ពីស្តាំទៅឆ្វេង)
+-- ==================================================
+local AnimationFrame = Instance.new("Frame")
+AnimationFrame.Name = "AnimationFrame"
+AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
+AnimationFrame.Position = UDim2.new(1, 0, 0, 0) -- ចាប់ផ្តើមពីស្តាំ
+AnimationFrame.BackgroundColor3 = Color3.fromRGB(180, 160, 255)
+AnimationFrame.BackgroundTransparency = 0.5
+AnimationFrame.BorderSizePixel = 0
+AnimationFrame.ZIndex = 2
+AnimationFrame.Parent = GodModeButton
+
+local AnimationCorner = Instance.new("UICorner")
+AnimationCorner.CornerRadius = UDim.new(0, 6)
+AnimationCorner.Parent = AnimationFrame
+
+-- ==================================================
+-- BUTTON ANIMATION (Hover)
+-- ==================================================
 GodModeButton.MouseEnter:Connect(function()
     TweenService:Create(GodModeButton, TweenInfo.new(0.15), {
         BackgroundColor3 = Color3.fromRGB(125, 110, 220)
@@ -272,22 +85,57 @@ GodModeButton.MouseLeave:Connect(function()
     }):Play()
 end)
 
-GodModeButton.MouseButton1Down:Connect(function()
-    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
-        BackgroundColor3 = Color3.fromRGB(85, 70, 170)
-    }):Play()
-end)
+-- ==================================================
+-- SLIDE ANIMATION FUNCTION
+-- ==================================================
+local function PlaySlideAnimation()
+    -- Reset Animation Frame
+    AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
+    AnimationFrame.Position = UDim2.new(1, 0, 0, 0) -- ចាប់ផ្តើមពីស្តាំ
+    AnimationFrame.BackgroundTransparency = 0.5
+    
+    -- រត់ពីស្តាំទៅឆ្វេង
+    local SlideTween = TweenService:Create(
+        AnimationFrame,
+        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Size = UDim2.new(1, 0, 1, 0), -- ពង្រីកពេញ
+            Position = UDim2.new(0, 0, 0, 0) -- ផ្លាស់ទៅឆ្វេង
+        }
+    )
+    
+    SlideTween:Play()
+    
+    -- បន្ទាប់ពីរត់រួច → Fade Out
+    SlideTween.Completed:Connect(function()
+        TweenService:Create(
+            AnimationFrame,
+            TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {
+                BackgroundTransparency = 1
+            }
+        ):Play()
+        
+        task.wait(0.2)
+        
+        -- Reset
+        AnimationFrame.BackgroundTransparency = 0.5
+        AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
+        AnimationFrame.Position = UDim2.new(1, 0, 0, 0)
+    end)
+end
 
-GodModeButton.MouseButton1Up:Connect(function()
-    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
-        BackgroundColor3 = Color3.fromRGB(125, 110, 220)
-    }):Play()
-end)
-
--- ពេល Click → គ្រាន់តែ Start God Mode មួយដង (បាត់ Toggle, បាត់ ON)
+-- ==================================================
+-- CLICK → PLAY ANIMATION + ENABLE GOD MODE
+-- ==================================================
 GodModeButton.MouseButton1Click:Connect(function()
+    -- Play Slide Animation
+    PlaySlideAnimation()
+    
+    -- Enable God Mode
     if _G.YOKUDO_GodMode then
         _G.YOKUDO_GodMode.Enable()
     end
 end)
+
 print("✅ Setting Tab Loaded")
