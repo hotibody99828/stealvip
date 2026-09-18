@@ -284,11 +284,80 @@ AddButtonAnimation(BypassButton)
 -- ==================================================
 -- FEATURE 3: ANTI TRAP (CHECKBOX)
 -- ==================================================
-local AntiTrapHolder, AntiTrapCheck, AntiTrapGetState = CreateCheckbox(
-    SettingPage,
-    "Anti Trap",
-    4
-)
+local AntiTrapHolder = Instance.new("Frame")
+AntiTrapHolder.Size = UDim2.new(1, 0, 0, 52)
+AntiTrapHolder.BackgroundTransparency = 1
+AntiTrapHolder.LayoutOrder = 4
+AntiTrapHolder.Parent = SettingPage
+
+local AntiTrapLabel = Instance.new("TextLabel")
+AntiTrapLabel.Size = UDim2.new(1, -50, 0, 20)
+AntiTrapLabel.Position = UDim2.new(0, 0, 0, 2)
+AntiTrapLabel.BackgroundTransparency = 1
+AntiTrapLabel.Text = "Anti Trap"
+AntiTrapLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
+AntiTrapLabel.TextSize = 13
+AntiTrapLabel.TextXAlignment = Enum.TextXAlignment.Left
+AntiTrapLabel.TextYAlignment = Enum.TextYAlignment.Center
+AntiTrapLabel.Font = Enum.Font.GothamBold
+AntiTrapLabel.Parent = AntiTrapHolder
+
+local AntiTrapTitle = Instance.new("TextLabel")
+AntiTrapTitle.Size = UDim2.new(1, -50, 0, 18)
+AntiTrapTitle.Position = UDim2.new(0, 0, 0, 24)
+AntiTrapTitle.BackgroundTransparency = 1
+AntiTrapTitle.Text = "click for remove Trap"
+AntiTrapTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
+AntiTrapTitle.TextSize = 10
+AntiTrapTitle.TextXAlignment = Enum.TextXAlignment.Left
+AntiTrapTitle.Font = Enum.Font.Gotham
+AntiTrapTitle.Parent = AntiTrapHolder
+
+local AntiTrapCheckButton = Instance.new("TextButton")
+AntiTrapCheckButton.Size = UDim2.new(0, 26, 0, 26)
+AntiTrapCheckButton.Position = UDim2.new(1, -26, 0.5, -13)
+AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+AntiTrapCheckButton.BorderSizePixel = 0
+AntiTrapCheckButton.Text = ""
+AntiTrapCheckButton.AutoButtonColor = false
+AntiTrapCheckButton.Parent = AntiTrapHolder
+
+local AntiTrapCorner = Instance.new("UICorner")
+AntiTrapCorner.CornerRadius = UDim.new(0, 6)
+AntiTrapCorner.Parent = AntiTrapCheckButton
+
+local AntiTrapStroke = Instance.new("UIStroke")
+AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
+AntiTrapStroke.Thickness = 1.5
+AntiTrapStroke.Parent = AntiTrapCheckButton
+
+local AntiTrapCheck = Instance.new("TextLabel")
+AntiTrapCheck.Size = UDim2.new(1, 0, 1, 0)
+AntiTrapCheck.BackgroundTransparency = 1
+AntiTrapCheck.Text = "✓"
+AntiTrapCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiTrapCheck.TextSize = 18
+AntiTrapCheck.Font = Enum.Font.GothamBold
+AntiTrapCheck.Visible = false
+AntiTrapCheck.Parent = AntiTrapCheckButton
+
+local AntiTrapEnabled = false
+
+local function ToggleAntiTrap()
+    AntiTrapEnabled = not AntiTrapEnabled
+    AntiTrapCheck.Visible = AntiTrapEnabled
+    if AntiTrapEnabled then
+        AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+        AntiTrapStroke.Color = Color3.fromRGB(135, 120, 225)
+    else
+        AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+        AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
+    end
+end
+
+AntiTrapCheckButton.MouseButton1Click:Connect(function()
+    ToggleAntiTrap()
+end)
 
 -- ==================================================
 -- FEATURE 4: GOD MODE
@@ -368,8 +437,8 @@ _G.YOKUDO_Features = {
     BypassButton = BypassButton,
     AntiTrap = {
         Holder = AntiTrapHolder,
-        Check = AntiTrapCheck,
-        GetState = AntiTrapGetState
+        Check = AntiTrapCheckButton,
+        GetState = function() return AntiTrapEnabled end
     },
     GodModeButton = GodModeButton
 }
