@@ -212,7 +212,7 @@ HopServerLabel.Parent = HopServerPage
 CreateSectionTitle(SettingPage, "Settings", 1)
 
 -- ==================================================
--- FEATURE 1: WALK SPEED (SHORT)
+-- FEATURE 1: WALK SPEED
 -- ==================================================
 local WalkSpeedHolder = Instance.new("Frame")
 WalkSpeedHolder.Size = UDim2.new(1, 0, 0, 32)
@@ -291,7 +291,6 @@ local function ToggleWalkSpeed()
     if WalkSpeedEnabled then
         WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         WalkSpeedStroke.Color = Color3.fromRGB(135, 120, 225)
-        -- Start WalkSpeed Feature
         if _G.YOKUDO_WalkSpeed then
             _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
             _G.YOKUDO_WalkSpeed.Toggle()
@@ -299,7 +298,6 @@ local function ToggleWalkSpeed()
     else
         WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
         WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
-        -- Stop WalkSpeed Feature
         if _G.YOKUDO_WalkSpeed then
             _G.YOKUDO_WalkSpeed.Disable()
         end
@@ -324,74 +322,12 @@ WalkSpeedTextBox.FocusLost:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 2: BYPASS ANTI CHEAT (BUTTON BIGGER THAN CHECKBOX)
--- ==================================================
-local BypassHolder = Instance.new("Frame")
-BypassHolder.Size = UDim2.new(1, 0, 0, 52)
-BypassHolder.BackgroundTransparency = 1
-BypassHolder.LayoutOrder = 3
-BypassHolder.Parent = SettingPage
-
-local BypassLabel = Instance.new("TextLabel")
-BypassLabel.Size = UDim2.new(1, -90, 0, 20)
-BypassLabel.Position = UDim2.new(0, 0, 0, 2)
-BypassLabel.BackgroundTransparency = 1
-BypassLabel.Text = "Bypass Anti Cheat"
-BypassLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
-BypassLabel.TextSize = 13
-BypassLabel.TextXAlignment = Enum.TextXAlignment.Left
-BypassLabel.TextYAlignment = Enum.TextYAlignment.Center
-BypassLabel.Font = Enum.Font.GothamBold
-BypassLabel.Parent = BypassHolder
-
-local BypassTitle = Instance.new("TextLabel")
-BypassTitle.Size = UDim2.new(1, -90, 0, 18)
-BypassTitle.Position = UDim2.new(0, 0, 0, 24)
-BypassTitle.BackgroundTransparency = 1
-BypassTitle.Text = "When Character Dead click Bypass Anti Cheat"
-BypassTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
-BypassTitle.TextSize = 10
-BypassTitle.TextXAlignment = Enum.TextXAlignment.Left
-BypassTitle.Font = Enum.Font.Gotham
-BypassTitle.Parent = BypassHolder
-
-local BypassButton = Instance.new("TextButton")
-BypassButton.Size = UDim2.new(0, 70, 0, 26)
-BypassButton.Position = UDim2.new(1, -70, 0.5, -13)
-BypassButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-BypassButton.BorderSizePixel = 0
-BypassButton.Text = "Click"
-BypassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-BypassButton.TextSize = 12
-BypassButton.Font = Enum.Font.GothamBold
-BypassButton.AutoButtonColor = false
-BypassButton.Parent = BypassHolder
-
-local BypassCorner = Instance.new("UICorner")
-BypassCorner.CornerRadius = UDim.new(0, 6)
-BypassCorner.Parent = BypassButton
-
-local BypassStroke = Instance.new("UIStroke")
-BypassStroke.Color = Color3.fromRGB(140, 125, 240)
-BypassStroke.Thickness = 1.5
-BypassStroke.Transparency = 0.3
-BypassStroke.Parent = BypassButton
-
-AddButtonAnimation(BypassButton)
-
-BypassButton.MouseButton1Click:Connect(function()
-    if _G.YOKUDO_Bypass then
-        _G.YOKUDO_Bypass.Toggle()
-    end
-end)
-
--- ==================================================
--- FEATURE 3: ANTI TRAP (CHECKBOX) - LINKED
+-- FEATURE 2: ANTI TRAP (CHECKBOX)
 -- ==================================================
 local AntiTrapHolder = Instance.new("Frame")
 AntiTrapHolder.Size = UDim2.new(1, 0, 0, 52)
 AntiTrapHolder.BackgroundTransparency = 1
-AntiTrapHolder.LayoutOrder = 4
+AntiTrapHolder.LayoutOrder = 3
 AntiTrapHolder.Parent = SettingPage
 
 local AntiTrapLabel = Instance.new("TextLabel")
@@ -453,14 +389,12 @@ local function ToggleAntiTrap()
     if AntiTrapEnabled then
         AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         AntiTrapStroke.Color = Color3.fromRGB(135, 120, 225)
-        -- Start Anti Trap Feature
         if _G.YOKUDO_AntiTrap then
             _G.YOKUDO_AntiTrap.Enable()
         end
     else
         AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
         AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
-        -- Stop Anti Trap Feature
         if _G.YOKUDO_AntiTrap then
             _G.YOKUDO_AntiTrap.Disable()
         end
@@ -472,12 +406,12 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 4: GOD MODE (BUTTON BIGGER THAN CHECKBOX) - LINKED
+-- FEATURE 3: GOD MODE (BUTTON)
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
 GodModeHolder.BackgroundTransparency = 1
-GodModeHolder.LayoutOrder = 5
+GodModeHolder.LayoutOrder = 4
 GodModeHolder.Parent = SettingPage
 
 local GodModeLabel = Instance.new("TextLabel")
@@ -552,7 +486,6 @@ _G.YOKUDO_Features = {
         TextBox = WalkSpeedTextBox,
         GetValue = function() return WalkSpeedValue end
     },
-    BypassButton = BypassButton,
     AntiTrap = {
         Holder = AntiTrapHolder,
         Check = AntiTrapCheckButton,
