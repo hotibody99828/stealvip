@@ -82,6 +82,29 @@ end
 SelectTab(InfoTab, InfoPage)
 
 -- ==================================================
+-- BUTTON ANIMATION FUNCTION
+-- ==================================================
+local function AddButtonAnimation(Button)
+    Button.MouseButton1Down:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset * 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset * 0.95)
+        }):Play()
+    end)
+    
+    Button.MouseButton1Up:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset / 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset / 0.95)
+        }):Play()
+    end)
+    
+    Button.MouseLeave:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset / 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset / 0.95)
+        }):Play()
+    end)
+end
+
+-- ==================================================
 -- 1. INFO PAGE
 -- ==================================================
 CreateSectionTitle(InfoPage, "YOKUDO HUB | Steal An Egg", 1)
@@ -198,13 +221,13 @@ local WalkSpeedHolder, WalkSpeedCheck, WalkSpeedGetState, WalkSpeedTextBox, Walk
 -- FEATURE 2: BYPASS ANTI CHEAT
 -- ==================================================
 local BypassHolder = Instance.new("Frame")
-BypassHolder.Size = UDim2.new(1, 0, 0, 32)
+BypassHolder.Size = UDim2.new(1, 0, 0, 48)
 BypassHolder.BackgroundTransparency = 1
 BypassHolder.LayoutOrder = 3
 BypassHolder.Parent = SettingPage
 
 local BypassLabel = Instance.new("TextLabel")
-BypassLabel.Size = UDim2.new(1, -110, 1, 0)
+BypassLabel.Size = UDim2.new(1, -110, 0, 22)
 BypassLabel.BackgroundTransparency = 1
 BypassLabel.Text = "Bypass Anti Cheat"
 BypassLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
@@ -214,12 +237,23 @@ BypassLabel.TextYAlignment = Enum.TextYAlignment.Center
 BypassLabel.Font = Enum.Font.GothamMedium
 BypassLabel.Parent = BypassHolder
 
+local BypassTitle = Instance.new("TextLabel")
+BypassTitle.Size = UDim2.new(1, 0, 0, 16)
+BypassTitle.Position = UDim2.new(0, 0, 0, 26)
+BypassTitle.BackgroundTransparency = 1
+BypassTitle.Text = "When Player Dead click Bypass Anti Cheat នេះ"
+BypassTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
+BypassTitle.TextSize = 10
+BypassTitle.TextXAlignment = Enum.TextXAlignment.Left
+BypassTitle.Font = Enum.Font.Gotham
+BypassTitle.Parent = BypassHolder
+
 local BypassButton = Instance.new("TextButton")
 BypassButton.Size = UDim2.new(0, 100, 0, 26)
-BypassButton.Position = UDim2.new(1, -100, 0.5, -13)
+BypassButton.Position = UDim2.new(1, -100, 0, 5)
 BypassButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 BypassButton.BorderSizePixel = 0
-BypassButton.Text = "Click for"
+BypassButton.Text = "Click"
 BypassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 BypassButton.TextSize = 12
 BypassButton.Font = Enum.Font.GothamBold
@@ -230,53 +264,28 @@ local BypassCorner = Instance.new("UICorner")
 BypassCorner.CornerRadius = UDim.new(0, 6)
 BypassCorner.Parent = BypassButton
 
+AddButtonAnimation(BypassButton)
+
 -- ==================================================
--- FEATURE 3: ANTI TRAP
+-- FEATURE 3: ANTI TRAP (CHECKBOX)
 -- ==================================================
-local AntiTrapHolder = Instance.new("Frame")
-AntiTrapHolder.Size = UDim2.new(1, 0, 0, 32)
-AntiTrapHolder.BackgroundTransparency = 1
-AntiTrapHolder.LayoutOrder = 4
-AntiTrapHolder.Parent = SettingPage
-
-local AntiTrapLabel = Instance.new("TextLabel")
-AntiTrapLabel.Size = UDim2.new(1, -110, 1, 0)
-AntiTrapLabel.BackgroundTransparency = 1
-AntiTrapLabel.Text = "Anti Trap"
-AntiTrapLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
-AntiTrapLabel.TextSize = 12
-AntiTrapLabel.TextXAlignment = Enum.TextXAlignment.Left
-AntiTrapLabel.TextYAlignment = Enum.TextYAlignment.Center
-AntiTrapLabel.Font = Enum.Font.GothamMedium
-AntiTrapLabel.Parent = AntiTrapHolder
-
-local AntiTrapButton = Instance.new("TextButton")
-AntiTrapButton.Size = UDim2.new(0, 100, 0, 26)
-AntiTrapButton.Position = UDim2.new(1, -100, 0.5, -13)
-AntiTrapButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-AntiTrapButton.BorderSizePixel = 0
-AntiTrapButton.Text = "Click for"
-AntiTrapButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-AntiTrapButton.TextSize = 12
-AntiTrapButton.Font = Enum.Font.GothamBold
-AntiTrapButton.AutoButtonColor = false
-AntiTrapButton.Parent = AntiTrapHolder
-
-local AntiTrapCorner = Instance.new("UICorner")
-AntiTrapCorner.CornerRadius = UDim.new(0, 6)
-AntiTrapCorner.Parent = AntiTrapButton
+local AntiTrapHolder, AntiTrapCheck, AntiTrapGetState = CreateCheckbox(
+    SettingPage,
+    "Anti Trap",
+    4
+)
 
 -- ==================================================
 -- FEATURE 4: GOD MODE
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
-GodModeHolder.Size = UDim2.new(1, 0, 0, 32)
+GodModeHolder.Size = UDim2.new(1, 0, 0, 48)
 GodModeHolder.BackgroundTransparency = 1
 GodModeHolder.LayoutOrder = 5
 GodModeHolder.Parent = SettingPage
 
 local GodModeLabel = Instance.new("TextLabel")
-GodModeLabel.Size = UDim2.new(1, -110, 1, 0)
+GodModeLabel.Size = UDim2.new(1, -110, 0, 22)
 GodModeLabel.BackgroundTransparency = 1
 GodModeLabel.Text = "God Mode"
 GodModeLabel.TextColor3 = Color3.fromRGB(205, 205, 220)
@@ -286,12 +295,23 @@ GodModeLabel.TextYAlignment = Enum.TextYAlignment.Center
 GodModeLabel.Font = Enum.Font.GothamMedium
 GodModeLabel.Parent = GodModeHolder
 
+local GodModeTitle = Instance.new("TextLabel")
+GodModeTitle.Size = UDim2.new(1, 0, 0, 16)
+GodModeTitle.Position = UDim2.new(0, 0, 0, 26)
+GodModeTitle.BackgroundTransparency = 1
+GodModeTitle.Text = "Enable God Mode to become invincible"
+GodModeTitle.TextColor3 = Color3.fromRGB(150, 150, 170)
+GodModeTitle.TextSize = 10
+GodModeTitle.TextXAlignment = Enum.TextXAlignment.Left
+GodModeTitle.Font = Enum.Font.Gotham
+GodModeTitle.Parent = GodModeHolder
+
 local GodModeButton = Instance.new("TextButton")
 GodModeButton.Size = UDim2.new(0, 100, 0, 26)
-GodModeButton.Position = UDim2.new(1, -100, 0.5, -13)
+GodModeButton.Position = UDim2.new(1, -100, 0, 5)
 GodModeButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 GodModeButton.BorderSizePixel = 0
-GodModeButton.Text = "Click for"
+GodModeButton.Text = "Click"
 GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 GodModeButton.TextSize = 12
 GodModeButton.Font = Enum.Font.GothamBold
@@ -301,6 +321,8 @@ GodModeButton.Parent = GodModeHolder
 local GodModeCorner = Instance.new("UICorner")
 GodModeCorner.CornerRadius = UDim.new(0, 6)
 GodModeCorner.Parent = GodModeButton
+
+AddButtonAnimation(GodModeButton)
 
 -- ==================================================
 -- EXPORT
@@ -322,7 +344,11 @@ _G.YOKUDO_Features = {
         GetValue = WalkSpeedGetValue
     },
     BypassButton = BypassButton,
-    AntiTrapButton = AntiTrapButton,
+    AntiTrap = {
+        Holder = AntiTrapHolder,
+        Check = AntiTrapCheck,
+        GetState = AntiTrapGetState
+    },
     GodModeButton = GodModeButton
 }
 
