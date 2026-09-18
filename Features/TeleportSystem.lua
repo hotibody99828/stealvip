@@ -30,7 +30,7 @@ local SAFE_ZONE = Vector3.new(533, 70, -366)
 
 local FLY_SPEED = 1100
 local RETURN_SPEED = 900
-local FLY_OFFSET = 15
+local FLY_OFFSET = 25
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
 local SAFE_LOCK_DISTANCE = 3
@@ -39,9 +39,9 @@ local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 1
 
 -- CAMERA SETTINGS (Top-Down View)
-local CAMERA_HEIGHT = 1
+local CAMERA_HEIGHT = 3
 local CAMERA_DISTANCE = 0
-local CAMERA_ZOOM_STEP = 1.0
+local CAMERA_ZOOM_STEP = 0.5
 local CAMERA_MIN_HEIGHT = 0
 local LOCK_WAIT = 0.2
 
