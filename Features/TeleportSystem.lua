@@ -1,7 +1,7 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
 -- Egg Collect + Fast Return to Safe
--- Camera Lock + Auto Loop
+-- Camera Lock ជាប់រហូតដល់បាន Egg លើកទី 2
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -66,7 +66,7 @@ local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
 local OriginalCameraSubject = nil
-local CameraLocked = false -- ថ្មី: តាមដានថា Camera Lock ឬអត់
+local CameraLocked = false
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -143,18 +143,16 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG (Check ទាំង Container និង Workspace)
+-- FIND EGG
 -- ==================================================
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
     
-    -- Check Container មុន
     if Container then
         local Egg = Container:FindFirstChild(TARGET_ID)
         if Egg then return Egg end
     end
     
-    -- Check Workspace
     local Egg = workspace:FindFirstChild(TARGET_ID)
     if Egg then return Egg end
     
@@ -193,7 +191,6 @@ end
 local function FindHoverInTarget()
     if not TARGET_ID then return nil end
     
-    -- Check Container
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
@@ -202,7 +199,6 @@ local function FindHoverInTarget()
         end
     end
 
-    -- Check Workspace
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
         local Hover = WSEgg:FindFirstChild("AreaEggHover")
@@ -425,13 +421,15 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
 end
 
 -- ==================================================
--- FLY TO SAFE ZONE
+-- FLY TO SAFE ZONE (Reset Camera ពេលទៅដល់)
 -- ==================================================
 local function FlyToSafeZone()
     GoingToSafe = true
     CurrentStep = "to_safe"
 
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
+        -- ទៅដល់ Safe Zone → Reset Camera
+        ResetCamera()
         CurrentStep = "stop"
     end)
 end
@@ -633,7 +631,6 @@ local function StartMainLoop()
         if WaitingRetry then return end
         if GoingToSafe then return end
 
-        -- Check Egg ទាំង Container និង Workspace
         local CachedEgg = FindEggAnywhere()
 
         if CurrentStep == "idle" and CachedEgg then
@@ -722,4 +719,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Camera Lock + Auto Loop)")
+print("✅ TeleportSystem Feature Loaded (Camera Lock until 2nd Collect)")
