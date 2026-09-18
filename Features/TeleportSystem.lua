@@ -1,6 +1,7 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
--- Egg Collect + Fast Return to Safe (PC + Mobile)
+-- Egg Collect + Fast Return to Safe
+-- Auto Collect ពេលឃើញ Hover
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -16,7 +17,10 @@ local Container = workspace:WaitForChild("AreaEggSlotsClient")
 -- ==================================================
 -- DETECT DEVICE
 -- ==================================================
-local IsMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+local IS_PC = not IS_MOBILE
+
+print("[YOKUDO] Device: " .. (IS_MOBILE and "Mobile" or "PC"))
 
 -- ==================================================
 -- PROXIMITY PROMPT
@@ -29,7 +33,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt)
 end)
 
 -- ==================================================
--- SETTINGS (ប្តូរតាម Device)
+-- SETTINGS
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
@@ -46,21 +50,20 @@ local Y_CHANGE_THRESHOLD = 1
 local CAMERA_DISTANCE = 1.5
 local CAMERA_ZOOM_STEP = 0.3
 local CAMERA_MIN_DISTANCE = 1.0
-
--- បង្កើន LOCK_WAIT សម្រាប់ Mobile
-local LOCK_WAIT = IsMobile and 0.5 or 0.2
-local PROMPT_WAIT = IsMobile and 0.3 or 0.1
-local HOVER_WAIT = IsMobile and 0.2 or 0.1
+local LOCK_WAIT = 0.2
 
 local LOOP_INTERVAL = 0.02
 local RETRY_WAIT = 2
 local COLLECT_TARGET = 2
+local COLLECT_RETRY_INTERVAL = 0.15 -- លឿនបន្តិច
 
 -- ==================================================
 -- STATE
 -- ==================================================
 local TARGET_ID = nil
 local CollectCount = 0
+local HoverFound = false
+local LastCollectFire = 0
 
 local Running = false
 local CurrentStep = "idle"
@@ -156,13 +159,11 @@ end
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
     
-    -- Check Container មុន (AreaEggSlotsClient)
     if Container then
         local Egg = Container:FindFirstChild(TARGET_ID)
         if Egg then return Egg end
     end
     
-    -- Check Workspace
     local Egg = workspace:FindFirstChild(TARGET_ID)
     if Egg then return Egg end
     
@@ -196,7 +197,7 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER IN TARGET (Check ទាំង Container និង Workspace)
+-- FIND HOVER IN TARGET (Check Children ទាំងអស់)
 -- ==================================================
 local function FindHoverInTarget()
     if not TARGET_ID then return nil end
@@ -205,16 +206,23 @@ local function FindHoverInTarget()
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
-            local Hover = Slot:FindFirstChild("AreaEggHover")
-            if Hover then return Hover end
+            -- Check Children ទាំងអស់
+            for _, child in ipairs(Slot:GetChildren()) do
+                if child.Name == "AreaEggHover" then
+                    return child
+                end
+            end
         end
     end
 
     -- Check Workspace
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
-        local Hover = WSEgg:FindFirstChild("AreaEggHover")
-        if Hover then return Hover end
+        for _, child in ipairs(WSEgg:GetChildren()) do
+            if child.Name == "AreaEggHover" then
+                return child
+            end
+        end
     end
 
     return nil
@@ -246,7 +254,7 @@ local function FindSmartPromptNearTarget(EggPos)
         ClosestPrompt.Enabled = true
         ClosestPrompt.HoldDuration = 0
         ClosestPrompt.RequiresLineOfSight = false
-        ClosestPrompt.MaxActivationDistance = 8
+        ClosestPrompt.MaxActivationDistance = 100 -- ធំជាងមុនសម្រាប់ Mobile
     end
 
     return ClosestPrompt
@@ -437,52 +445,6 @@ local function FlyToSafeZone()
 end
 
 -- ==================================================
--- LOCK + ZOOM + HOVER + PROMPT (សម្រាប់ Mobile)
--- ==================================================
-local function LockAndCollect(EggPos)
-    local Hum, Root = GetHumanoid()
-    if not Root then return false end
-
-    -- Lock Position
-    Root.CFrame = CFrame.new(EggPos)
-    Root.AssemblyLinearVelocity = Vector3.zero
-    Root.AssemblyAngularVelocity = Vector3.zero
-
-    -- Face Egg
-    FaceEgg(EggPos)
-
-    -- Force Camera
-    ForceCameraToEgg(EggPos, CurrentZoom)
-
-    -- Check Hover ច្រើនដង
-    local StartTime = tick()
-    while tick() - StartTime < LOCK_WAIT do
-        task.wait(HOVER_WAIT)
-        
-        local Hover = FindHoverInTarget()
-        if Hover then
-            TargetHover = Hover
-            
-            -- បង្កើត Prompt
-            if not TargetPromptPart then
-                TargetPromptPart = FindSmartPromptNearTarget(EggPos)
-            end
-            
-            -- Fire Prompt ច្រើនដង
-            if TargetPromptPart then
-                for i = 1, 5 do
-                    PromptTarget()
-                    task.wait(0.05)
-                end
-                return true
-            end
-        end
-    end
-
-    return false
-end
-
--- ==================================================
 -- RESET STATE RETRY
 -- ==================================================
 local function ResetStateRetry()
@@ -496,6 +458,8 @@ local function ResetStateRetry()
     WaitingRetry = false
     RetryStartTime = 0
     GoingToSafe = false
+    HoverFound = false
+    LastCollectFire = 0
 
     CleanupMovers()
     ResetCamera()
@@ -522,6 +486,8 @@ local function FullReset()
     RetryStartTime = 0
     GoingToSafe = false
     CollectCount = 0
+    HoverFound = false
+    LastCollectFire = 0
 
     CleanupMovers()
     if ActiveHeartbeat then
@@ -539,7 +505,7 @@ local function FullReset()
 end
 
 -- ==================================================
--- HEARTBEAT (Active)
+-- HEARTBEAT (Active) - Auto Collect ពេលឃើញ Hover
 -- ==================================================
 local function StartActiveHeartbeat()
     if ActiveHeartbeat then
@@ -569,29 +535,9 @@ local function StartActiveHeartbeat()
             return
         end
 
-        -- FAST Y CHECK
-        local CurrentEgg = FindEggAnywhere()
-        local CurrentY = nil
-
-        if CurrentEgg then
-            CurrentY = GetEggY(CurrentEgg)
-        end
-
-        if SavedYBefore and CurrentY and not CollectDone then
-            if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
-                CollectDone = true
-                CollectCount = CollectCount + 1
-
-                if CollectCount >= COLLECT_TARGET then
-                    FlyToSafeZone()
-                else
-                    WaitingRetry = true
-                    RetryStartTime = tick()
-                end
-            end
-        end
-
-        -- LOCK + FACE + CAMERA + HOVER + PROMPT
+        -- ============================================
+        -- LOCK + FACE + CAMERA + HOVER + AUTO COLLECT
+        -- ============================================
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -605,8 +551,61 @@ local function StartActiveHeartbeat()
                 return
             end
 
-            -- ប្រើ LockAndCollect សម្រាប់ទាំង PC និង Mobile
-            LockAndCollect(EggPos)
+            Root.CFrame = CFrame.new(EggPos)
+            Root.AssemblyLinearVelocity = Vector3.zero
+            Root.AssemblyAngularVelocity = Vector3.zero
+
+            FaceEgg(EggPos)
+            ForceCameraToEgg(EggPos, CurrentZoom)
+
+            local Elapsed = tick() - LockStartTime
+
+            if Elapsed >= LOCK_WAIT then
+                -- Check Hover ក្នុង Children
+                local Hover2 = FindHoverInTarget()
+
+                if Hover2 then
+                    HoverFound = true
+                    TargetHover = Hover2
+
+                    if not TargetPromptPart then
+                        TargetPromptPart = FindSmartPromptNearTarget(EggPos)
+                    end
+
+                    -- Auto Collect ភ្លាម ពេលឃើញ Hover
+                    if TargetPromptPart then
+                        local now = tick()
+                        if now - LastCollectFire >= COLLECT_RETRY_INTERVAL then
+                            LastCollectFire = now
+                            PromptTarget()
+                            
+                            -- Check Y Change សម្រាប់ Confirm
+                            local Y = GetEggY(TargetEgg)
+                            if Y and SavedYBefore and not CollectDone then
+                                if Y - SavedYBefore >= Y_CHANGE_THRESHOLD then
+                                    CollectDone = true
+                                    CollectCount = CollectCount + 1
+                                    
+                                    if CollectCount >= COLLECT_TARGET then
+                                        FlyToSafeZone()
+                                    else
+                                        WaitingRetry = true
+                                        RetryStartTime = tick()
+                                    end
+                                end
+                            elseif Y and not SavedYBefore then
+                                SavedYBefore = Y
+                            end
+                        end
+                    end
+                else
+                    -- បន្ត Zoom ចូល
+                    CurrentZoom = CurrentZoom - CAMERA_ZOOM_STEP
+                    if CurrentZoom < CAMERA_MIN_DISTANCE then
+                        CurrentZoom = CAMERA_MIN_DISTANCE
+                    end
+                end
+            end
 
         elseif CurrentStep == "to_safe" then
             -- Handled by FlyToSafeZone
@@ -648,6 +647,9 @@ local function StartMainLoop()
                     CurrentZoom = CAMERA_DISTANCE
                     TargetPromptPart = nil
                     SavedYBefore = nil
+                    CollectDone = false
+                    HoverFound = false
+                    LastCollectFire = 0
 
                     CurrentStep = "to_egg"
 
@@ -677,12 +679,14 @@ local function Enable()
     WaitingRetry = false
     GoingToSafe = false
     CollectCount = 0
+    HoverFound = false
+    LastCollectFire = 0
     SaveStats()
 
     StartActiveHeartbeat()
     StartMainLoop()
 
-    print("[YOKUDO] Teleport System: ON (Mobile: " .. tostring(IsMobile) .. ")")
+    print("[YOKUDO] Teleport System: ON (" .. (IS_MOBILE and "Mobile" or "PC") .. ")")
 end
 
 local function Disable()
@@ -710,7 +714,7 @@ _G.YOKUDO_TeleportSystem = {
     ResetState = ResetState,
     IsEnabled = function() return Running end,
     GetTargetId = function() return TARGET_ID end,
-    IsMobile = function() return IsMobile end
+    IsMobile = function() return IS_MOBILE end
 }
 
-print("✅ TeleportSystem Feature Loaded")
+print("✅ TeleportSystem Feature Loaded (" .. (IS_MOBILE and "Mobile" or "PC") .. ")")
