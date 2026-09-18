@@ -11,14 +11,14 @@ local Player = Players.LocalPlayer
 local Backpack = Player:WaitForChild("Backpack")
 
 -- ==================================================
--- GET BAT SWING REMOTE
+-- FIND REMOTE (Path ពិត)
 -- ==================================================
 local function GetBatSwingRemote()
     local Success, Remote = pcall(function()
         return ReplicatedStorage.Packages.Networking["RE/BatSwing/Trigger"]
     end)
     
-    if Success and Remote and Remote:IsA("RemoteEvent") then
+    if Success and Remote then
         return Remote
     end
     
@@ -177,11 +177,6 @@ local function FindClosestPlayer()
 end
 
 local function HitPlayer()
-    if not CurrentBat then
-        CurrentBat = FindBatTool()
-        if not CurrentBat then return end
-    end
-    
     local Target = FindClosestPlayer()
     
     -- Face Target
@@ -197,7 +192,7 @@ local function HitPlayer()
         end
     end
     
-    -- ប្រើ Remote
+    -- ប្រើ Remote ពិត
     local Remote = GetBatSwingRemote()
     if Remote then
         TraceSequence = TraceSequence + 1
@@ -206,6 +201,13 @@ local function HitPlayer()
         pcall(function()
             Remote:FireServer(Target, TraceId)
         end)
+    else
+        -- Fallback
+        if CurrentBat then
+            pcall(function()
+                CurrentBat:Activate()
+            end)
+        end
     end
 end
 
@@ -265,19 +267,16 @@ end)
 -- EXPORT
 -- ==================================================
 _G.YOKUDO_AutoAttack = {
-    -- Auto Equip
     ToggleAutoEquip = ToggleAutoEquip,
     EnableAutoEquip = EnableAutoEquip,
     DisableAutoEquip = DisableAutoEquip,
     IsAutoEquipEnabled = function() return AutoEquipEnabled end,
     
-    -- Auto Hit
     ToggleAutoHit = ToggleAutoHit,
     EnableAutoHit = EnableAutoHit,
     DisableAutoHit = DisableAutoHit,
     IsAutoHitEnabled = function() return AutoHitEnabled end,
     
-    -- Utils
     FindBatTool = FindBatTool,
     GetBatSwingRemote = GetBatSwingRemote
 }
