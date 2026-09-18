@@ -198,39 +198,35 @@ Loading.Update(60)
 loadstring(GetScript("Tabs/Setting.lua"))()
 
 -- ==================================================
--- LOAD FEATURES
+-- LOAD FEATURES (លើកលែង Anti Cheat)
 -- ==================================================
 Loading.Update(65)
 loadstring(GetScript("Features/WalkSpeed.lua"))()
 
 Loading.Update(70)
-loadstring(GetScript("Features/BypassAntiCheat.lua"))()
-
-Loading.Update(75)
 loadstring(GetScript("Features/AntiTrap.lua"))()
 
-Loading.Update(80)
+Loading.Update(75)
 loadstring(GetScript("Features/GodMode.lua"))()
 
-Loading.Update(85)
+Loading.Update(80)
 loadstring(GetScript("Features/TeleportSystem.lua"))()
-
--- ==================================================
--- AUTO ENABLE BYPASS ANTI CHEAT
--- ==================================================
-Loading.Update(90)
-if _G.YOKUDO_Bypass then
-    _G.YOKUDO_Bypass.Enable()
-    print("[YOKUDO] Bypass Anti Cheat: AUTO ENABLED")
-end
 
 -- ==================================================
 -- SELECT DEFAULT TAB
 -- ==================================================
-Loading.Update(95)
+Loading.Update(85)
 if _G.YOKUDO_TabsManager then
     _G.YOKUDO_TabsManager:SelectTabByName("Info")
 end
+
+Loading.Update(90)
+
+-- ==================================================
+-- LOAD ANTI CHEAT (ក្រោយគេបង្អស់)
+-- ==================================================
+Loading.Update(95)
+loadstring(GetScript("Features/BypassAntiCheat.lua"))()
 
 Loading.Update(100)
 
