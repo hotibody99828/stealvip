@@ -4,6 +4,7 @@
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 
 -- ==================================================
 -- VARIABLES
@@ -17,17 +18,24 @@ local Connection = nil
 local function EnableAntiTrap()
     AntiTrapEnabled = true
     
-    -- TODO: Add Anti Trap Logic Here
-    -- ឧទាហរណ៍: ពិនិត្យមើល Trap ក្នុង Workspace និង Teleport ចេញ
-    
     if Connection then
         Connection:Disconnect()
     end
     
-    Connection = game:GetService("RunService").Heartbeat:Connect(function()
-        if not AntiTrapEnabled then return end
-        
-        -- TODO: Add Loop Logic Here
+    Connection = task.spawn(function()
+        while AntiTrapEnabled do
+            task.wait(1)
+            
+            local Debris = Workspace:FindFirstChild("__DEBRIS")
+            if Debris then
+                for _, child in ipairs(Debris:GetChildren()) do
+                    pcall(function()
+                        child:Destroy()
+                    end)
+                end
+                print("[YOKUDO] Anti Trap: Cleared __DEBRIS")
+            end
+        end
     end)
     
     print("[YOKUDO] Anti Trap: ON")
@@ -37,7 +45,7 @@ local function DisableAntiTrap()
     AntiTrapEnabled = false
     
     if Connection then
-        Connection:Disconnect()
+        task.cancel(Connection)
         Connection = nil
     end
     
