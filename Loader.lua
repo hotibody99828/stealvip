@@ -185,6 +185,28 @@ loadstring(GetScript("Features/AntiTrap.lua"))()
 Loading.Update(80)
 loadstring(GetScript("Features/GodMode.lua"))()
 
+-- ==================================================
+-- AUTO ENABLE BYPASS ANTI CHEAT
+-- ==================================================
+Loading.Update(85)
+if _G.YOKUDO_Bypass then
+    _G.YOKUDO_Bypass.Enable()
+    print("[YOKUDO] Bypass Anti Cheat: AUTO ENABLED")
+end
+
+Loading.Update(90)
+
+-- ==================================================
+-- AUTO RE-RUN BYPASS ON CHARACTER ADDED
+-- ==================================================
+Player.CharacterAdded:Connect(function()
+    task.wait(2)
+    if _G.YOKUDO_Bypass then
+        _G.YOKUDO_Bypass.Enable()
+        print("[YOKUDO] Bypass Anti Cheat: Re-applied on new Character")
+    end
+end)
+
 Loading.Update(100)
 
 task.wait(0.3)
