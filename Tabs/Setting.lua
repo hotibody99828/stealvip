@@ -204,7 +204,6 @@ end
 AntiTrapCheckButton.MouseButton1Click:Connect(function()
     ToggleAntiTrap()
 end)
-
 -- ==================================================
 -- FEATURE 3: GOD MODE (BUTTON)
 -- ==================================================
@@ -247,7 +246,6 @@ GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 GodModeButton.TextSize = 12
 GodModeButton.Font = Enum.Font.GothamBold
 GodModeButton.AutoButtonColor = false
-GodModeButton.ClipsDescendants = true
 GodModeButton.Parent = GodModeHolder
 
 local GodModeCorner = Instance.new("UICorner")
@@ -259,23 +257,6 @@ GodModeStroke.Color = Color3.fromRGB(140, 125, 240)
 GodModeStroke.Thickness = 1.5
 GodModeStroke.Transparency = 0.3
 GodModeStroke.Parent = GodModeButton
-
--- ==================================================
--- ANIMATION FRAME (រត់ពីស្តាំទៅឆ្វេង)
--- ==================================================
-local AnimationFrame = Instance.new("Frame")
-AnimationFrame.Name = "AnimationFrame"
-AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
-AnimationFrame.Position = UDim2.new(1, 0, 0, 0) -- ចាប់ផ្តើមពីស្តាំ
-AnimationFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- ពណ៌សច្បាស់
-AnimationFrame.BackgroundTransparency = 0
-AnimationFrame.BorderSizePixel = 0
-AnimationFrame.ZIndex = 3 -- ខ្ពស់ជាង Button
-AnimationFrame.Parent = GodModeButton
-
-local AnimationCorner = Instance.new("UICorner")
-AnimationCorner.CornerRadius = UDim.new(0, 6)
-AnimationCorner.Parent = AnimationFrame
 
 -- ==================================================
 -- BUTTON ANIMATION (Hover)
@@ -293,46 +274,6 @@ GodModeButton.MouseLeave:Connect(function()
 end)
 
 -- ==================================================
--- SLIDE ANIMATION FUNCTION (ច្បាស់)
--- ==================================================
-local function PlaySlideAnimation()
-    -- Reset Animation Frame
-    AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
-    AnimationFrame.Position = UDim2.new(1, 0, 0, 0)
-    AnimationFrame.BackgroundTransparency = 0
-    
-    -- រត់ពីស្តាំទៅឆ្វេង
-    local SlideTween = TweenService:Create(
-        AnimationFrame,
-        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {
-            Size = UDim2.new(1, 0, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0)
-        }
-    )
-    
-    SlideTween:Play()
-    
-    -- បន្ទាប់ពីរត់រួច → Fade Out
-    SlideTween.Completed:Connect(function()
-        TweenService:Create(
-            AnimationFrame,
-            TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {
-                BackgroundTransparency = 1
-            }
-        ):Play()
-        
-        task.wait(0.2)
-        
-        -- Reset
-        AnimationFrame.BackgroundTransparency = 0
-        AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
-        AnimationFrame.Position = UDim2.new(1, 0, 0, 0)
-    end)
-end
-
--- ==================================================
 -- BUTTON CLICK ANIMATION (Scale)
 -- ==================================================
 GodModeButton.MouseButton1Down:Connect(function()
@@ -348,16 +289,66 @@ GodModeButton.MouseButton1Up:Connect(function()
 end)
 
 -- ==================================================
--- CLICK → PLAY ANIMATION + ENABLE GOD MODE
+-- NOTIFICATION FUNCTION
+-- ==================================================
+local function ShowNotification(Text)
+    local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    
+    local NotifyGui = Instance.new("ScreenGui")
+    NotifyGui.Name = "YokudoNotify"
+    NotifyGui.ResetOnSpawn = false
+    NotifyGui.Parent = PlayerGui
+    
+    local NotifyFrame = Instance.new("Frame")
+    NotifyFrame.Size = UDim2.new(0, 200, 0, 40)
+    NotifyFrame.Position = UDim2.new(0.5, -100, 0, -50)
+    NotifyFrame.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+    NotifyFrame.BorderSizePixel = 0
+    NotifyFrame.Parent = NotifyGui
+    
+    local NotifyCorner = Instance.new("UICorner")
+    NotifyCorner.CornerRadius = UDim.new(0, 8)
+    NotifyCorner.Parent = NotifyFrame
+    
+    local NotifyText = Instance.new("TextLabel")
+    NotifyText.Size = UDim2.new(1, -20, 1, 0)
+    NotifyText.Position = UDim2.new(0, 10, 0, 0)
+    NotifyText.BackgroundTransparency = 1
+    NotifyText.Text = Text
+    NotifyText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NotifyText.TextSize = 12
+    NotifyText.Font = Enum.Font.GothamBold
+    NotifyText.Parent = NotifyFrame
+    
+    -- Slide Down
+    TweenService:Create(NotifyFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, -100, 0, 20)
+    }):Play()
+    
+    -- Fade Out
+    task.wait(2)
+    TweenService:Create(NotifyFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        BackgroundTransparency = 1
+    }):Play()
+    TweenService:Create(NotifyText, TweenInfo.new(0.3), {
+        TextTransparency = 1
+    }):Play()
+    
+    task.wait(0.3)
+    NotifyGui:Destroy()
+end
+
+-- ==================================================
+-- CLICK → PLAY ANIMATION + ENABLE GOD MODE + NOTIFY
 -- ==================================================
 GodModeButton.MouseButton1Click:Connect(function()
-    -- Play Slide Animation
-    PlaySlideAnimation()
-    
     -- Enable God Mode
     if _G.YOKUDO_GodMode then
         _G.YOKUDO_GodMode.Enable()
     end
+    
+    -- Show Notification
+    ShowNotification("God Mode Start")
 end)
 
 print("✅ Setting Tab Loaded")
