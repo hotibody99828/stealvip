@@ -99,14 +99,12 @@ local function AddButtonAnimation(Button)
 
     Button.MouseButton1Down:Connect(function()
         TweenService:Create(Button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset * 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset * 0.95),
             BackgroundColor3 = Color3.fromRGB(85, 70, 170)
         }):Play()
     end)
 
     Button.MouseButton1Up:Connect(function()
         TweenService:Create(Button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(Button.Size.X.Scale, Button.Size.X.Offset / 0.95, Button.Size.Y.Scale, Button.Size.Y.Offset / 0.95),
             BackgroundColor3 = Color3.fromRGB(125, 110, 220)
         }):Play()
     end)
@@ -314,7 +312,7 @@ WalkSpeedTextBox.FocusLost:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 2: BYPASS ANTI CHEAT (SHORT BUTTON)
+-- FEATURE 2: BYPASS ANTI CHEAT (BUTTON BIGGER THAN CHECKBOX)
 -- ==================================================
 local BypassHolder = Instance.new("Frame")
 BypassHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -323,7 +321,7 @@ BypassHolder.LayoutOrder = 3
 BypassHolder.Parent = SettingPage
 
 local BypassLabel = Instance.new("TextLabel")
-BypassLabel.Size = UDim2.new(1, -70, 0, 20)
+BypassLabel.Size = UDim2.new(1, -90, 0, 20)
 BypassLabel.Position = UDim2.new(0, 0, 0, 2)
 BypassLabel.BackgroundTransparency = 1
 BypassLabel.Text = "Bypass Anti Cheat"
@@ -335,7 +333,7 @@ BypassLabel.Font = Enum.Font.GothamBold
 BypassLabel.Parent = BypassHolder
 
 local BypassTitle = Instance.new("TextLabel")
-BypassTitle.Size = UDim2.new(1, -70, 0, 18)
+BypassTitle.Size = UDim2.new(1, -90, 0, 18)
 BypassTitle.Position = UDim2.new(0, 0, 0, 24)
 BypassTitle.BackgroundTransparency = 1
 BypassTitle.Text = "When Character Dead click Bypass Anti Cheat"
@@ -346,13 +344,13 @@ BypassTitle.Font = Enum.Font.Gotham
 BypassTitle.Parent = BypassHolder
 
 local BypassButton = Instance.new("TextButton")
-BypassButton.Size = UDim2.new(0, 26, 0, 26)
-BypassButton.Position = UDim2.new(1, -26, 0.5, -13)
+BypassButton.Size = UDim2.new(0, 70, 0, 26)
+BypassButton.Position = UDim2.new(1, -70, 0.5, -13)
 BypassButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 BypassButton.BorderSizePixel = 0
-BypassButton.Text = "C"
+BypassButton.Text = "Click"
 BypassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-BypassButton.TextSize = 13
+BypassButton.TextSize = 12
 BypassButton.Font = Enum.Font.GothamBold
 BypassButton.AutoButtonColor = false
 BypassButton.Parent = BypassHolder
@@ -448,7 +446,7 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 4: GOD MODE (SHORT BUTTON)
+-- FEATURE 4: GOD MODE (BUTTON BIGGER THAN CHECKBOX)
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -457,7 +455,7 @@ GodModeHolder.LayoutOrder = 5
 GodModeHolder.Parent = SettingPage
 
 local GodModeLabel = Instance.new("TextLabel")
-GodModeLabel.Size = UDim2.new(1, -70, 0, 20)
+GodModeLabel.Size = UDim2.new(1, -90, 0, 20)
 GodModeLabel.Position = UDim2.new(0, 0, 0, 2)
 GodModeLabel.BackgroundTransparency = 1
 GodModeLabel.Text = "God Mode"
@@ -469,7 +467,7 @@ GodModeLabel.Font = Enum.Font.GothamBold
 GodModeLabel.Parent = GodModeHolder
 
 local GodModeTitle = Instance.new("TextLabel")
-GodModeTitle.Size = UDim2.new(1, -70, 0, 18)
+GodModeTitle.Size = UDim2.new(1, -90, 0, 18)
 GodModeTitle.Position = UDim2.new(0, 0, 0, 24)
 GodModeTitle.BackgroundTransparency = 1
 GodModeTitle.Text = "When Character Dead click God Mode"
@@ -480,13 +478,13 @@ GodModeTitle.Font = Enum.Font.Gotham
 GodModeTitle.Parent = GodModeHolder
 
 local GodModeButton = Instance.new("TextButton")
-GodModeButton.Size = UDim2.new(0, 26, 0, 26)
-GodModeButton.Position = UDim2.new(1, -26, 0.5, -13)
+GodModeButton.Size = UDim2.new(0, 70, 0, 26)
+GodModeButton.Position = UDim2.new(1, -70, 0.5, -13)
 GodModeButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
 GodModeButton.BorderSizePixel = 0
-GodModeButton.Text = "C"
+GodModeButton.Text = "Click"
 GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-GodModeButton.TextSize = 13
+GodModeButton.TextSize = 12
 GodModeButton.Font = Enum.Font.GothamBold
 GodModeButton.AutoButtonColor = false
 GodModeButton.Parent = GodModeHolder
