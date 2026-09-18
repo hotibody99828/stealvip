@@ -28,8 +28,8 @@ end)
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 500
-local RETURN_SPEED = 350
+local FLY_SPEED = 1100
+local RETURN_SPEED = 900
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
