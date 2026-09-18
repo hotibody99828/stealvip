@@ -293,7 +293,7 @@ local function ToggleWalkSpeed()
         WalkSpeedStroke.Color = Color3.fromRGB(135, 120, 225)
         if _G.YOKUDO_WalkSpeed then
             _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
-            _G.YOKUDO_WalkSpeed.Toggle()
+            _G.YOKUDO_WalkSpeed.Enable()
         end
     else
         WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
@@ -311,7 +311,7 @@ end)
 WalkSpeedTextBox.FocusLost:Connect(function()
     local val = tonumber(WalkSpeedTextBox.Text)
     if val then
-        WalkSpeedValue = math.clamp(val, 50, 1200)
+        WalkSpeedValue = math.clamp(val, 50, 1000)
         WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
         if WalkSpeedEnabled and _G.YOKUDO_WalkSpeed then
             _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
@@ -406,7 +406,7 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 3: GOD MODE (BUTTON) - LINKED
+-- FEATURE 3: GOD MODE (BUTTON)
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
