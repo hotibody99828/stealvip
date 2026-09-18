@@ -27,8 +27,8 @@ end)
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1000
-local RETURN_SPEED = 800
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -146,13 +146,11 @@ end
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
     
-    -- Check Container មុន
     if Container then
         local Egg = Container:FindFirstChild(TARGET_ID)
         if Egg then return Egg end
     end
     
-    -- Check Workspace
     local Egg = workspace:FindFirstChild(TARGET_ID)
     if Egg then return Egg end
     
@@ -191,7 +189,6 @@ end
 local function FindHoverInTarget()
     if not TARGET_ID then return nil end
     
-    -- Check Container
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
@@ -200,7 +197,6 @@ local function FindHoverInTarget()
         end
     end
 
-    -- Check Workspace
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
         local Hover = WSEgg:FindFirstChild("AreaEggHover")
@@ -363,16 +359,13 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE then
                 CleanupMovers()
-
                 Hum2.PlatformStand = false
                 Root2.CFrame = CFrame.new(SAFE_ZONE)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
-
                 if Callback then Callback() end
                 return
             end
@@ -381,24 +374,20 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         if UseShotTP and HorizDist <= SHOT_DISTANCE and not ShotDone then
             ShotDone = true
             CleanupMovers()
-
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
             if Callback then Callback() end
             return
         end
 
         if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
             CleanupMovers()
-
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
             if Callback then Callback() end
             return
         end
@@ -442,11 +431,13 @@ local function ResetStateRetry()
     TargetHover = nil
     LockStartTime = 0
     CurrentZoom = CAMERA_DISTANCE
-    SavedYBefore = nil
-    CollectDone = false
     WaitingRetry = false
     RetryStartTime = 0
     GoingToSafe = false
+
+    -- Reset សម្រាប់ Round ថ្មី
+    SavedYBefore = nil
+    CollectDone = false
 
     CleanupMovers()
     ResetCamera()
@@ -513,11 +504,9 @@ local function StartActiveHeartbeat()
 
             if Elapsed >= RETRY_WAIT then
                 if CollectCount >= COLLECT_TARGET then
-                    -- Done all -> Fly to Safe
                     WaitingRetry = false
                     FlyToSafeZone()
                 else
-                    -- Retry (Round #2)
                     ResetStateRetry()
                 end
             end
@@ -540,10 +529,8 @@ local function StartActiveHeartbeat()
                 CollectCount = CollectCount + 1
 
                 if CollectCount >= COLLECT_TARGET then
-                    -- Done all -> Fly Safe IMMEDIATELY
                     FlyToSafeZone()
                 else
-                    -- Retry (Round #2)
                     WaitingRetry = true
                     RetryStartTime = tick()
                 end
@@ -629,7 +616,6 @@ local function StartMainLoop()
         if WaitingRetry then return end
         if GoingToSafe then return end
 
-        -- Check Egg ទាំង Container និង Workspace
         local CachedEgg = FindEggAnywhere()
 
         if CurrentStep == "idle" and CachedEgg then
@@ -693,17 +679,6 @@ local function ResetState()
     print("[YOKUDO] Teleport System: State Reset")
 end
 
-local function GetState()
-    return {
-        Running = Running,
-        CurrentStep = CurrentStep,
-        CollectCount = CollectCount,
-        TargetId = TARGET_ID,
-        Hover = TargetHover ~= nil,
-        Prompt = TargetPromptPart ~= nil
-    }
-end
-
 -- ==================================================
 -- EXPORT
 -- ==================================================
@@ -712,7 +687,6 @@ _G.YOKUDO_TeleportSystem = {
     Disable = Disable,
     SetTargetId = SetTargetId,
     ResetState = ResetState,
-    GetState = GetState,
     IsEnabled = function() return Running end,
     GetTargetId = function() return TARGET_ID end
 }
