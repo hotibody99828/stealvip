@@ -3,6 +3,8 @@
 -- ==================================================
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
 local Player = Players.LocalPlayer
 
 -- ==================================================
@@ -14,7 +16,7 @@ local OriginalWalkSpeed = 16
 local Connection = nil
 
 -- ==================================================
--- GET CHARACTER
+-- GET HUMANOID
 -- ==================================================
 local function GetHumanoid()
     local Char = Player.Character
@@ -61,7 +63,7 @@ local function StartWalkSpeed()
         Connection:Disconnect()
     end
     
-    Connection = game:GetService("RunService").Heartbeat:Connect(function()
+    Connection = RunService.Heartbeat:Connect(function()
         if WalkSpeedEnabled then
             ApplyWalkSpeed()
         end
@@ -69,7 +71,18 @@ local function StartWalkSpeed()
 end
 
 -- ==================================================
--- TOGGLE FUNCTION
+-- SET VALUE (ពេល User វាយ Value ថ្មី)
+-- ==================================================
+local function SetWalkSpeedValue(Value)
+    WalkSpeedValue = math.clamp(Value, 50, 1000)
+    if WalkSpeedEnabled then
+        ApplyWalkSpeed()
+    end
+    print("[YOKUDO] Walk Speed Value: " .. WalkSpeedValue)
+end
+
+-- ==================================================
+-- TOGGLE FUNCTION (ពេល User ធីក Checkbox)
 -- ==================================================
 local function ToggleWalkSpeed()
     WalkSpeedEnabled = not WalkSpeedEnabled
@@ -84,21 +97,41 @@ local function ToggleWalkSpeed()
 end
 
 -- ==================================================
--- SET VALUE FUNCTION
+-- ENABLE / DISABLE
 -- ==================================================
-local function SetWalkSpeedValue(Value)
-    WalkSpeedValue = math.clamp(Value, 50, 1200)
+local function EnableWalkSpeed()
+    WalkSpeedEnabled = true
+    StartWalkSpeed()
+    print("[YOKUDO] Walk Speed: ON (" .. WalkSpeedValue .. ")")
+end
+
+local function DisableWalkSpeed()
+    WalkSpeedEnabled = false
+    StopWalkSpeed()
+    print("[YOKUDO] Walk Speed: OFF")
+end
+
+-- ==================================================
+-- AUTO RE-APPLY ON CHARACTER ADDED
+-- ==================================================
+Player.CharacterAdded:Connect(function()
     if WalkSpeedEnabled then
+        task.wait(1)
+        local Hum = GetHumanoid()
+        if Hum then
+            OriginalWalkSpeed = Hum.WalkSpeed
+        end
         ApplyWalkSpeed()
     end
-    print("[YOKUDO] Walk Speed Value: " .. WalkSpeedValue)
-end
+end)
 
 -- ==================================================
 -- EXPORT
 -- ==================================================
 _G.YOKUDO_WalkSpeed = {
     Toggle = ToggleWalkSpeed,
+    Enable = EnableWalkSpeed,
+    Disable = DisableWalkSpeed,
     SetValue = SetWalkSpeedValue,
     IsEnabled = function() return WalkSpeedEnabled end,
     GetValue = function() return WalkSpeedValue end
