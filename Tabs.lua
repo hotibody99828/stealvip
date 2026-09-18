@@ -291,9 +291,18 @@ local function ToggleWalkSpeed()
     if WalkSpeedEnabled then
         WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         WalkSpeedStroke.Color = Color3.fromRGB(135, 120, 225)
+        -- Start WalkSpeed Feature
+        if _G.YOKUDO_WalkSpeed then
+            _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
+            _G.YOKUDO_WalkSpeed.Toggle()
+        end
     else
         WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
         WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
+        -- Stop WalkSpeed Feature
+        if _G.YOKUDO_WalkSpeed then
+            _G.YOKUDO_WalkSpeed.Disable()
+        end
     end
 end
 
@@ -306,6 +315,9 @@ WalkSpeedTextBox.FocusLost:Connect(function()
     if val then
         WalkSpeedValue = math.clamp(val, 50, 1200)
         WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
+        if WalkSpeedEnabled and _G.YOKUDO_WalkSpeed then
+            _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
+        end
     else
         WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
     end
@@ -367,8 +379,14 @@ BypassStroke.Parent = BypassButton
 
 AddButtonAnimation(BypassButton)
 
+BypassButton.MouseButton1Click:Connect(function()
+    if _G.YOKUDO_Bypass then
+        _G.YOKUDO_Bypass.Toggle()
+    end
+end)
+
 -- ==================================================
--- FEATURE 3: ANTI TRAP (CHECKBOX)
+-- FEATURE 3: ANTI TRAP (CHECKBOX) - LINKED
 -- ==================================================
 local AntiTrapHolder = Instance.new("Frame")
 AntiTrapHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -435,9 +453,17 @@ local function ToggleAntiTrap()
     if AntiTrapEnabled then
         AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         AntiTrapStroke.Color = Color3.fromRGB(135, 120, 225)
+        -- Start Anti Trap Feature
+        if _G.YOKUDO_AntiTrap then
+            _G.YOKUDO_AntiTrap.Enable()
+        end
     else
         AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
         AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
+        -- Stop Anti Trap Feature
+        if _G.YOKUDO_AntiTrap then
+            _G.YOKUDO_AntiTrap.Disable()
+        end
     end
 end
 
@@ -446,7 +472,7 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 4: GOD MODE (BUTTON BIGGER THAN CHECKBOX)
+-- FEATURE 4: GOD MODE (BUTTON BIGGER THAN CHECKBOX) - LINKED
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -500,6 +526,12 @@ GodModeStroke.Transparency = 0.3
 GodModeStroke.Parent = GodModeButton
 
 AddButtonAnimation(GodModeButton)
+
+GodModeButton.MouseButton1Click:Connect(function()
+    if _G.YOKUDO_GodMode then
+        _G.YOKUDO_GodMode.Toggle()
+    end
+end)
 
 -- ==================================================
 -- EXPORT
