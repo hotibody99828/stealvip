@@ -247,6 +247,7 @@ GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 GodModeButton.TextSize = 12
 GodModeButton.Font = Enum.Font.GothamBold
 GodModeButton.AutoButtonColor = false
+GodModeButton.ClipsDescendants = true -- សម្រាប់ Animation
 GodModeButton.Parent = GodModeHolder
 
 local GodModeCorner = Instance.new("UICorner")
@@ -259,7 +260,26 @@ GodModeStroke.Thickness = 1.5
 GodModeStroke.Transparency = 0.3
 GodModeStroke.Parent = GodModeButton
 
--- បន្ថែម Animation
+-- ==================================================
+-- ANIMATION FRAME (រត់ពីស្តាំទៅឆ្វេង)
+-- ==================================================
+local AnimationFrame = Instance.new("Frame")
+AnimationFrame.Name = "AnimationFrame"
+AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
+AnimationFrame.Position = UDim2.new(1, 0, 0, 0) -- ចាប់ផ្តើមពីស្តាំ
+AnimationFrame.BackgroundColor3 = Color3.fromRGB(180, 160, 255)
+AnimationFrame.BackgroundTransparency = 0.5
+AnimationFrame.BorderSizePixel = 0
+AnimationFrame.ZIndex = 2
+AnimationFrame.Parent = GodModeButton
+
+local AnimationCorner = Instance.new("UICorner")
+AnimationCorner.CornerRadius = UDim.new(0, 6)
+AnimationCorner.Parent = AnimationFrame
+
+-- ==================================================
+-- BUTTON ANIMATION (Hover)
+-- ==================================================
 GodModeButton.MouseEnter:Connect(function()
     TweenService:Create(GodModeButton, TweenInfo.new(0.15), {
         BackgroundColor3 = Color3.fromRGB(125, 110, 220)
@@ -272,20 +292,53 @@ GodModeButton.MouseLeave:Connect(function()
     }):Play()
 end)
 
-GodModeButton.MouseButton1Down:Connect(function()
-    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
-        BackgroundColor3 = Color3.fromRGB(85, 70, 170)
-    }):Play()
-end)
+-- ==================================================
+-- SLIDE ANIMATION FUNCTION
+-- ==================================================
+local function PlaySlideAnimation()
+    -- Reset Animation Frame
+    AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
+    AnimationFrame.Position = UDim2.new(1, 0, 0, 0) -- ចាប់ផ្តើមពីស្តាំ
+    
+    -- រត់ពីស្តាំទៅឆ្វេង
+    local SlideTween = TweenService:Create(
+        AnimationFrame,
+        TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Size = UDim2.new(1, 0, 1, 0), -- ពង្រីកពេញ
+            Position = UDim2.new(0, 0, 0, 0) -- ផ្លាស់ទៅឆ្វេង
+        }
+    )
+    
+    SlideTween:Play()
+    
+    -- បន្ទាប់ពីរត់រួច → Fade Out
+    SlideTween.Completed:Connect(function()
+        TweenService:Create(
+            AnimationFrame,
+            TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {
+                BackgroundTransparency = 1
+            }
+        ):Play()
+        
+        task.wait(0.2)
+        
+        -- Reset
+        AnimationFrame.BackgroundTransparency = 0.5
+        AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
+        AnimationFrame.Position = UDim2.new(1, 0, 0, 0)
+    end)
+end
 
-GodModeButton.MouseButton1Up:Connect(function()
-    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
-        BackgroundColor3 = Color3.fromRGB(125, 110, 220)
-    }):Play()
-end)
-
--- ពេល Click → គ្រាន់តែ Start God Mode មួយដង (បាត់ Toggle, បាត់ ON)
+-- ==================================================
+-- CLICK → PLAY ANIMATION + ENABLE GOD MODE
+-- ==================================================
 GodModeButton.MouseButton1Click:Connect(function()
+    -- Play Slide Animation
+    PlaySlideAnimation()
+    
+    -- Enable God Mode
     if _G.YOKUDO_GodMode then
         _G.YOKUDO_GodMode.Enable()
     end
