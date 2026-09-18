@@ -161,51 +161,44 @@ Loading.Update(5)
 Loading.Update(10)
 loadstring(GetScript("Config.lua"))()
 
-Loading.Update(20)
+Loading.Update(15)
 loadstring(GetScript("UI.lua"))()
 
-Loading.Update(30)
+Loading.Update(25)
 loadstring(GetScript("Components.lua"))()
 
-Loading.Update(40)
+Loading.Update(35)
 loadstring(GetScript("Tabs.lua"))()
 
 -- ==================================================
 -- LOAD FEATURES
 -- ==================================================
-Loading.Update(50)
+Loading.Update(45)
 loadstring(GetScript("Features/WalkSpeed.lua"))()
 
-Loading.Update(60)
+Loading.Update(55)
 loadstring(GetScript("Features/BypassAntiCheat.lua"))()
 
-Loading.Update(70)
+Loading.Update(65)
 loadstring(GetScript("Features/AntiTrap.lua"))()
 
-Loading.Update(80)
+Loading.Update(75)
 loadstring(GetScript("Features/GodMode.lua"))()
+
+Loading.Update(85)
+loadstring(GetScript("Features/AutoFarm.lua"))()
+
+Loading.Update(90)
+loadstring(GetScript("Features/TeleportSystem.lua"))()
 
 -- ==================================================
 -- AUTO ENABLE BYPASS ANTI CHEAT
 -- ==================================================
-Loading.Update(85)
+Loading.Update(95)
 if _G.YOKUDO_Bypass then
     _G.YOKUDO_Bypass.Enable()
     print("[YOKUDO] Bypass Anti Cheat: AUTO ENABLED")
 end
-
-Loading.Update(90)
-
--- ==================================================
--- AUTO RE-RUN BYPASS ON CHARACTER ADDED
--- ==================================================
-Player.CharacterAdded:Connect(function()
-    task.wait(2)
-    if _G.YOKUDO_Bypass then
-        _G.YOKUDO_Bypass.Enable()
-        print("[YOKUDO] Bypass Anti Cheat: Re-applied on new Character")
-    end
-end)
 
 Loading.Update(100)
 
