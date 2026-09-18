@@ -6,11 +6,17 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local UserInputService = game:GetService("UserInputService")
 
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
+
+-- ==================================================
+-- DETECT DEVICE
+-- ==================================================
+local IsMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
 -- ==================================================
 -- PROXIMITY PROMPT
@@ -23,7 +29,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt)
 end)
 
 -- ==================================================
--- SETTINGS
+-- SETTINGS (ប្តូរតាម Device)
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
@@ -40,7 +46,11 @@ local Y_CHANGE_THRESHOLD = 1
 local CAMERA_DISTANCE = 1.5
 local CAMERA_ZOOM_STEP = 0.3
 local CAMERA_MIN_DISTANCE = 1.0
-local LOCK_WAIT = 0.2
+
+-- បង្កើន LOCK_WAIT សម្រាប់ Mobile
+local LOCK_WAIT = IsMobile and 0.5 or 0.2
+local PROMPT_WAIT = IsMobile and 0.3 or 0.1
+local HOVER_WAIT = IsMobile and 0.2 or 0.1
 
 local LOOP_INTERVAL = 0.02
 local RETRY_WAIT = 2
@@ -142,7 +152,6 @@ end
 
 -- ==================================================
 -- FIND EGG (Check ទាំង Container និង Workspace)
--- ប្រើ TARGET_ID ដូចគ្នា ប៉ុន្តែ Path ខុសគ្នា
 -- ==================================================
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
@@ -428,7 +437,53 @@ local function FlyToSafeZone()
 end
 
 -- ==================================================
--- RESET STATE RETRY (Round #1 → Round #2)
+-- LOCK + ZOOM + HOVER + PROMPT (សម្រាប់ Mobile)
+-- ==================================================
+local function LockAndCollect(EggPos)
+    local Hum, Root = GetHumanoid()
+    if not Root then return false end
+
+    -- Lock Position
+    Root.CFrame = CFrame.new(EggPos)
+    Root.AssemblyLinearVelocity = Vector3.zero
+    Root.AssemblyAngularVelocity = Vector3.zero
+
+    -- Face Egg
+    FaceEgg(EggPos)
+
+    -- Force Camera
+    ForceCameraToEgg(EggPos, CurrentZoom)
+
+    -- Check Hover ច្រើនដង
+    local StartTime = tick()
+    while tick() - StartTime < LOCK_WAIT do
+        task.wait(HOVER_WAIT)
+        
+        local Hover = FindHoverInTarget()
+        if Hover then
+            TargetHover = Hover
+            
+            -- បង្កើត Prompt
+            if not TargetPromptPart then
+                TargetPromptPart = FindSmartPromptNearTarget(EggPos)
+            end
+            
+            -- Fire Prompt ច្រើនដង
+            if TargetPromptPart then
+                for i = 1, 5 do
+                    PromptTarget()
+                    task.wait(0.05)
+                end
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+-- ==================================================
+-- RESET STATE RETRY
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
@@ -499,7 +554,7 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- WAIT RETRY (2s before retry)
+        -- WAIT RETRY
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
@@ -514,7 +569,7 @@ local function StartActiveHeartbeat()
             return
         end
 
-        -- FAST Y CHECK (Confirm Collect)
+        -- FAST Y CHECK
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
@@ -550,40 +605,8 @@ local function StartActiveHeartbeat()
                 return
             end
 
-            Root.CFrame = CFrame.new(EggPos)
-            Root.AssemblyLinearVelocity = Vector3.zero
-            Root.AssemblyAngularVelocity = Vector3.zero
-
-            FaceEgg(EggPos)
-            ForceCameraToEgg(EggPos, CurrentZoom)
-
-            local Elapsed = tick() - LockStartTime
-
-            if Elapsed >= LOCK_WAIT then
-                local Y = GetEggY(TargetEgg)
-                if Y and not SavedYBefore then
-                    SavedYBefore = Y
-                end
-
-                local Hover2 = FindHoverInTarget()
-
-                if Hover2 then
-                    TargetHover = Hover2
-
-                    if not TargetPromptPart then
-                        TargetPromptPart = FindSmartPromptNearTarget(EggPos)
-                    end
-
-                    if TargetPromptPart then
-                        PromptTarget()
-                    end
-                else
-                    CurrentZoom = CurrentZoom - CAMERA_ZOOM_STEP
-                    if CurrentZoom < CAMERA_MIN_DISTANCE then
-                        CurrentZoom = CAMERA_MIN_DISTANCE
-                    end
-                end
-            end
+            -- ប្រើ LockAndCollect សម្រាប់ទាំង PC និង Mobile
+            LockAndCollect(EggPos)
 
         elseif CurrentStep == "to_safe" then
             -- Handled by FlyToSafeZone
@@ -659,7 +682,7 @@ local function Enable()
     StartActiveHeartbeat()
     StartMainLoop()
 
-    print("[YOKUDO] Teleport System: ON")
+    print("[YOKUDO] Teleport System: ON (Mobile: " .. tostring(IsMobile) .. ")")
 end
 
 local function Disable()
@@ -686,7 +709,8 @@ _G.YOKUDO_TeleportSystem = {
     SetTargetId = SetTargetId,
     ResetState = ResetState,
     IsEnabled = function() return Running end,
-    GetTargetId = function() return TARGET_ID end
+    GetTargetId = function() return TARGET_ID end,
+    IsMobile = function() return IsMobile end
 }
 
 print("✅ TeleportSystem Feature Loaded")
