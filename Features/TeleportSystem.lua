@@ -28,9 +28,10 @@ end)
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
 local FLY_SPEED = 1000
-local RETURN_SPEED = 800
+local RETURN_SPEED = 500
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
+local PROMPT_RANGE = 8
 local ARRIVE_DISTANCE = 2
 local SAFE_LOCK_DISTANCE = 3
 
@@ -180,7 +181,7 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER
+-- HOVER IN TARGET
 -- ==================================================
 local function FindHoverInTarget()
     if not TARGET_ID then return nil, nil end
@@ -235,7 +236,7 @@ local function FindSmartPromptNearTarget(EggPos)
 end
 
 -- ==================================================
--- CAMERA
+-- CAMERA FORCE
 -- ==================================================
 local function ForceCameraToEgg(EggPos, Distance)
     if not Camera then return end
@@ -284,7 +285,7 @@ local function FaceEgg(EggPos)
 end
 
 -- ==================================================
--- PROMPT
+-- PROMPT TARGET
 -- ==================================================
 local function PromptTarget()
     if not TargetPromptPart then return 0 end
@@ -360,13 +361,16 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
+        -- SAFE ZONE
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE then
                 CleanupMovers()
+
                 Hum2.PlatformStand = false
                 Root2.CFrame = CFrame.new(SAFE_ZONE)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
+
                 if Callback then Callback() end
                 return
             end
@@ -375,20 +379,24 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         if UseShotTP and HorizDist <= SHOT_DISTANCE and not ShotDone then
             ShotDone = true
             CleanupMovers()
+
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
+
             if Callback then Callback() end
             return
         end
 
         if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
             CleanupMovers()
+
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
+
             if Callback then Callback() end
             return
         end
@@ -424,7 +432,7 @@ local function FlyToSafeZone()
 end
 
 -- ==================================================
--- RESET RETRY
+-- RESET STATE RETRY
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
@@ -442,6 +450,7 @@ local function ResetStateRetry()
     ResetCamera()
 
     CurrentStep = "idle"
+
     print("[YOKUDO] State Reset - Retry")
 end
 
@@ -476,11 +485,11 @@ local function FullReset()
     ResetCamera()
     RestoreStats()
 
-    print("[YOKUDO] Teleport System: Full Reset")
+    print("[YOKUDO] Full Reset")
 end
 
 -- ==================================================
--- HEARTBEAT
+-- HEARTBEAT (Active)
 -- ==================================================
 local function StartActiveHeartbeat()
     if ActiveHeartbeat then
@@ -495,6 +504,7 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
+        -- WAIT RETRY
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
@@ -509,6 +519,7 @@ local function StartActiveHeartbeat()
             return
         end
 
+        -- FAST Y CHECK (Confirm)
         local CurrentEgg = workspace:FindFirstChild(TARGET_ID) or (Container and Container:FindFirstChild(TARGET_ID))
         local CurrentY = nil
 
@@ -530,6 +541,7 @@ local function StartActiveHeartbeat()
             end
         end
 
+        -- LOCK + FACE + CAMERA + HOVER + PROMPT
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -579,6 +591,7 @@ local function StartActiveHeartbeat()
             end
 
         elseif CurrentStep == "to_safe" then
+            -- Handled by FlyToSafeZone
 
         elseif CurrentStep == "stop" then
             FullReset()
@@ -691,6 +704,17 @@ local function ResetState()
     print("[YOKUDO] Teleport System: State Reset")
 end
 
+local function GetState()
+    return {
+        Running = Running,
+        CurrentStep = CurrentStep,
+        CollectCount = CollectCount,
+        TargetId = TARGET_ID,
+        Hover = TargetHover ~= nil,
+        Prompt = TargetPromptPart ~= nil
+    }
+end
+
 -- ==================================================
 -- EXPORT
 -- ==================================================
@@ -699,6 +723,7 @@ _G.YOKUDO_TeleportSystem = {
     Disable = Disable,
     SetTargetId = SetTargetId,
     ResetState = ResetState,
+    GetState = GetState,
     IsEnabled = function() return Running end,
     GetTargetId = function() return TARGET_ID end
 }
