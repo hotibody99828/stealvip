@@ -213,6 +213,12 @@ Loading.Update(80)
 loadstring(GetScript("Features/TeleportSystem.lua"))()
 
 -- ==================================================
+-- LOAD AUTO ATTACK
+-- ==================================================
+Loading.Update(82)
+loadstring(GetScript("Features/AutoAttack.lua"))()
+
+-- ==================================================
 -- SELECT DEFAULT TAB
 -- ==================================================
 Loading.Update(85)
