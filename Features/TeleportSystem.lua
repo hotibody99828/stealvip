@@ -1,558 +1,387 @@
 -- ==================================================
--- YOKUDO HUB | TAB | Auto Farming
+-- YOKUDO HUB | FEATURE | Bypass Anti Cheat
+-- Humanoid Replace + Anti Death
 -- ==================================================
 
-local TabsManager = _G.YOKUDO_TabsManager
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 
-local AutoFarmingTab, AutoFarmingPage = TabsManager:RegisterTab("Auto Farming", 4, "AUTO_FARMING")
+local Player = Players.LocalPlayer
 
 -- ==================================================
--- SETUP ASSETS
+-- MAIN FUNCTION
 -- ==================================================
-local Assets = ReplicatedStorage:WaitForChild("Data"):WaitForChild("Assets")
-local Configs = Assets:WaitForChild("Configs")
-local EggModels = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Models"):WaitForChild("Eggs")
-local Container = workspace:WaitForChild("AreaEggSlotsClient")
+local function RunBypassAntiCheat()
+    local Character = Player.Character
+    if not Character then return end
 
-local MeshIdToCategory = {}
+    local OldHumanoid = Character:FindFirstChildOfClass("Humanoid")
+    if not OldHumanoid then
+        warn("[YOKUDO] Humanoid not found")
+        return
+    end
 
-local function BuildMeshIdMap()
-    for _, Config in ipairs(Configs:GetChildren()) do
-        local Success, Module = pcall(function()
-            return require(Config)
+    print("========================================")
+    print("[YOKUDO] START HUMANOID REPLACE")
+    print("========================================")
+
+    --==================================================
+    -- ANTI DEATH SETTINGS
+    --==================================================
+    local GodMode = true
+
+    --==================================================
+    -- SAVE JUMP PROPERTIES
+    --==================================================
+    local SavedJumpProperties = {}
+
+    local function SaveJumpProperty(Property)
+        local Success, Value = pcall(function()
+            return OldHumanoid[Property]
         end)
-        if Success and Module and Module.Egg then
-            local ModelName = Module.Egg.ModelName or Config.Name
-            local EggTemplate = EggModels:FindFirstChild(ModelName)
-            if EggTemplate then
-                for _, descendant in ipairs(EggTemplate:GetDescendants()) do
-                    if descendant:IsA("MeshPart") and descendant.MeshId ~= "" then
-                        MeshIdToCategory[descendant.MeshId] = Config.Name
-                    end
-                    if descendant:IsA("SpecialMesh") and descendant.MeshId ~= "" then
-                        MeshIdToCategory[descendant.MeshId] = Config.Name
-                    end
-                end
-            end
+        if Success then
+            SavedJumpProperties[Property] = Value
         end
     end
-end
 
-BuildMeshIdMap()
+    SaveJumpProperty("JumpPower")
+    SaveJumpProperty("JumpHeight")
+    SaveJumpProperty("UseJumpPower")
 
-local function GetPetData(AssetCategory)
-    local Config = Configs:FindFirstChild(AssetCategory)
-    if not Config then return nil end
-    
-    local Data = {
-        Name = AssetCategory,
-        DisplayName = AssetCategory,
-        EarningRate = 0,
-        Icon = nil
+    --==================================================
+    -- SAVE STATE MACHINE
+    --==================================================
+    local SavedEvaluateStateMachine
+    pcall(function()
+        SavedEvaluateStateMachine = OldHumanoid.EvaluateStateMachine
+    end)
+
+    --==================================================
+    -- SAVE ALL HUMANOID STATE SETTINGS
+    --==================================================
+    local SavedStates = {}
+    local States = {
+        Enum.HumanoidStateType.FallingDown,
+        Enum.HumanoidStateType.Running,
+        Enum.HumanoidStateType.RunningNoPhysics,
+        Enum.HumanoidStateType.Climbing,
+        Enum.HumanoidStateType.StrafingNoPhysics,
+        Enum.HumanoidStateType.Ragdoll,
+        Enum.HumanoidStateType.GettingUp,
+        Enum.HumanoidStateType.Jumping,
+        Enum.HumanoidStateType.Landed,
+        Enum.HumanoidStateType.Flying,
+        Enum.HumanoidStateType.Freefall,
+        Enum.HumanoidStateType.Seated,
+        Enum.HumanoidStateType.PlatformStanding,
+        Enum.HumanoidStateType.Dead,
+        Enum.HumanoidStateType.Swimming,
+        Enum.HumanoidStateType.Physics,
     }
-    
-    local Success, Module = pcall(function()
-        return require(Config)
-    end)
-    
-    if Success and Module then
-        Data.DisplayName = Module.DisplayName or AssetCategory
-        Data.EarningRate = Module.EarningRate or 0
-        Data.Icon = Module.Icon
-    end
-    
-    return Data
-end
 
-local function FormatMoney(Amount)
-    if type(Amount) ~= "number" then return tostring(Amount) end
-    if Amount >= 1e12 then
-        return string.format("%.2fT", Amount / 1e12)
-    elseif Amount >= 1e9 then
-        return string.format("%.2fB", Amount / 1e9)
-    elseif Amount >= 1e6 then
-        return string.format("%.2fM", Amount / 1e6)
-    elseif Amount >= 1e3 then
-        return string.format("%.2fK", Amount / 1e3)
-    else
-        return tostring(math.floor(Amount))
-    end
-end
-
-local function CalculateRatePerSecond(EarningRate, Scale, Mutations)
-    local PayoutFactor
-    if Scale <= 5 then
-        PayoutFactor = Scale ^ 1.85
-    else
-        PayoutFactor = (Scale / 5) ^ 1.2 * 19.637875755794113
-    end
-    
-    local MutationMultiplier = 1
-    if Mutations and #Mutations > 0 then
-        local Success, MutationsModule = pcall(function()
-            return require(ReplicatedStorage.Shared.Modules.Mutations)
+    for _, State in ipairs(States) do
+        local Success, Enabled = pcall(function()
+            return OldHumanoid:GetStateEnabled(State)
         end)
-        if Success and MutationsModule then
-            MutationMultiplier = MutationsModule.EarningsFor(Mutations)
+        if Success then
+            SavedStates[State] = Enabled
         end
     end
-    
-    return math.round(EarningRate * PayoutFactor * MutationMultiplier)
-end
 
-local function FindAssetCategory(EggModel)
-    for _, descendant in ipairs(EggModel:GetDescendants()) do
-        if descendant:IsA("MeshPart") and descendant.MeshId ~= "" then
-            local Category = MeshIdToCategory[descendant.MeshId]
-            if Category then return Category end
-        end
-        if descendant:IsA("SpecialMesh") and descendant.MeshId ~= "" then
-            local Category = MeshIdToCategory[descendant.MeshId]
-            if Category then return Category end
-        end
+    --==================================================
+    -- CLONE HUMANOID
+    --==================================================
+    local NewHumanoid = OldHumanoid:Clone()
+    if not NewHumanoid then
+        warn("[YOKUDO] Failed to clone Humanoid")
+        return
     end
-    return nil
-end
+    NewHumanoid.Name = OldHumanoid.Name
 
--- ==================================================
--- CONTENT
--- ==================================================
-CreateSectionTitle(AutoFarmingPage, "Auto Farming", 1)
-
--- ==================================================
--- FEATURE 1: Click Get Egg (កាតតូច)
--- ==================================================
-local GetEggBox = Instance.new("Frame")
-GetEggBox.Size = UDim2.new(1, 0, 0, 60)
-GetEggBox.BackgroundColor3 = Color3.fromRGB(28, 29, 42)
-GetEggBox.BorderSizePixel = 0
-GetEggBox.LayoutOrder = 2
-GetEggBox.Parent = AutoFarmingPage
-
-local GetEggBoxCorner = Instance.new("UICorner")
-GetEggBoxCorner.CornerRadius = UDim.new(0, 8)
-GetEggBoxCorner.Parent = GetEggBox
-
-local GetEggBoxStroke = Instance.new("UIStroke")
-GetEggBoxStroke.Color = Color3.fromRGB(105, 90, 190)
-GetEggBoxStroke.Thickness = 1.5
-GetEggBoxStroke.Transparency = 0.4
-GetEggBoxStroke.Parent = GetEggBox
-
--- Icon
-local GetEggIcon = Instance.new("ImageLabel")
-GetEggIcon.Size = UDim2.new(0, 40, 0, 40)
-GetEggIcon.Position = UDim2.new(0, 10, 0.5, -20)
-GetEggIcon.BackgroundColor3 = Color3.fromRGB(40, 42, 58)
-GetEggIcon.BorderSizePixel = 0
-GetEggIcon.Image = ""
-GetEggIcon.Parent = GetEggBox
-
-local GetEggIconCorner = Instance.new("UICorner")
-GetEggIconCorner.CornerRadius = UDim.new(0, 6)
-GetEggIconCorner.Parent = GetEggIcon
-
--- Name
-local GetEggName = Instance.new("TextLabel")
-GetEggName.Size = UDim2.new(1, -140, 0, 16)
-GetEggName.Position = UDim2.new(0, 58, 0, 10)
-GetEggName.BackgroundTransparency = 1
-GetEggName.Text = "No Egg Selected"
-GetEggName.TextColor3 = Color3.fromRGB(255, 255, 255)
-GetEggName.TextSize = 12
-GetEggName.TextXAlignment = Enum.TextXAlignment.Left
-GetEggName.Font = Enum.Font.GothamBold
-GetEggName.Parent = GetEggBox
-
--- Rate
-local GetEggRate = Instance.new("TextLabel")
-GetEggRate.Size = UDim2.new(1, -140, 0, 16)
-GetEggRate.Position = UDim2.new(0, 58, 0, 30)
-GetEggRate.BackgroundTransparency = 1
-GetEggRate.Text = "$0/s"
-GetEggRate.TextColor3 = Color3.fromRGB(100, 255, 100)
-GetEggRate.TextSize = 11
-GetEggRate.TextXAlignment = Enum.TextXAlignment.Left
-GetEggRate.Font = Enum.Font.Gotham
-GetEggRate.Parent = GetEggBox
-
--- Checkbox
-local GetEggCheckButton = Instance.new("TextButton")
-GetEggCheckButton.Size = UDim2.new(0, 34, 0, 34)
-GetEggCheckButton.Position = UDim2.new(1, -44, 0.5, -17)
-GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-GetEggCheckButton.BackgroundTransparency = 0.85
-GetEggCheckButton.BorderSizePixel = 0
-GetEggCheckButton.Text = ""
-GetEggCheckButton.AutoButtonColor = false
-GetEggCheckButton.Parent = GetEggBox
-
-local GetEggCheckCorner = Instance.new("UICorner")
-GetEggCheckCorner.CornerRadius = UDim.new(0, 8)
-GetEggCheckCorner.Parent = GetEggCheckButton
-
-local GetEggCheckStroke = Instance.new("UIStroke")
-GetEggCheckStroke.Color = Color3.fromRGB(255, 255, 255)
-GetEggCheckStroke.Thickness = 2
-GetEggCheckStroke.Parent = GetEggCheckButton
-
-local GetEggCheck = Instance.new("TextLabel")
-GetEggCheck.Size = UDim2.new(1, 0, 1, 0)
-GetEggCheck.BackgroundTransparency = 1
-GetEggCheck.Text = "✓"
-GetEggCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
-GetEggCheck.TextSize = 20
-GetEggCheck.Font = Enum.Font.GothamBold
-GetEggCheck.Visible = false
-GetEggCheck.Parent = GetEggCheckButton
-
-local SelectedEggId = nil
-local GetEggEnabled = false
-
--- Update Box (ភ្លាមៗ + Animation)
-local function UpdateGetEggBox(Icon, Name, Rate, EggId)
-    GetEggIcon.Image = Icon or ""
-    GetEggName.Text = Name or "No Egg Selected"
-    GetEggRate.Text = "$" .. FormatMoney(Rate or 0) .. "/s"
-    SelectedEggId = EggId
-    
-    -- Animation ពេល Update
-    GetEggBox.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-    TweenService:Create(GetEggBox, TweenInfo.new(0.3), {
-        BackgroundColor3 = Color3.fromRGB(28, 29, 42)
-    }):Play()
-    
-    GetEggIcon.ImageTransparency = 1
-    GetEggName.TextTransparency = 1
-    GetEggRate.TextTransparency = 1
-    
-    TweenService:Create(GetEggIcon, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
-    TweenService:Create(GetEggName, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
-    TweenService:Create(GetEggRate, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
-end
-
-local function ToggleGetEgg()
-    GetEggEnabled = not GetEggEnabled
-    GetEggCheck.Visible = GetEggEnabled
-    if GetEggEnabled then
-        GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-        GetEggCheckButton.BackgroundTransparency = 0
-        GetEggCheckStroke.Color = Color3.fromRGB(135, 120, 225)
-        if SelectedEggId and _G.YOKUDO_TeleportSystem then
-            _G.YOKUDO_TeleportSystem.SetTargetId(SelectedEggId)
-            _G.YOKUDO_TeleportSystem.Enable()
+    --==================================================
+    -- MOVE HUMANOID CHILDREN
+    --==================================================
+    for _, Child in ipairs(OldHumanoid:GetChildren()) do
+        local ExistingCloneChild = NewHumanoid:FindFirstChild(Child.Name)
+        if ExistingCloneChild then
+            pcall(function()
+                ExistingCloneChild:Destroy()
+            end)
         end
-    else
-        GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        GetEggCheckButton.BackgroundTransparency = 0.85
-        GetEggCheckStroke.Color = Color3.fromRGB(255, 255, 255)
-        if _G.YOKUDO_TeleportSystem then
-            _G.YOKUDO_TeleportSystem.Disable()
-            _G.YOKUDO_TeleportSystem.ResetState()
-        end
+        pcall(function()
+            Child.Parent = NewHumanoid
+        end)
     end
-end
 
-GetEggCheckButton.MouseButton1Click:Connect(function()
-    ToggleGetEgg()
-end)
+    --==================================================
+    -- IMPORTANT REPLACEMENT ORDER
+    --==================================================
+    OldHumanoid:Destroy()
+    task.wait()
+    NewHumanoid.Parent = Character
+    task.wait()
 
--- ==================================================
--- FEATURE 2: Start Check Egg (កាតតូច)
--- ==================================================
-local CheckEggHolder = Instance.new("Frame")
-CheckEggHolder.Size = UDim2.new(1, 0, 0, 44)
-CheckEggHolder.BackgroundColor3 = Color3.fromRGB(28, 29, 42)
-CheckEggHolder.BorderSizePixel = 0
-CheckEggHolder.LayoutOrder = 3
-CheckEggHolder.Parent = AutoFarmingPage
+    if not NewHumanoid.Parent then
+        warn("[YOKUDO] New Humanoid was removed")
+        return
+    end
 
-local CheckEggHolderCorner = Instance.new("UICorner")
-CheckEggHolderCorner.CornerRadius = UDim.new(0, 8)
-CheckEggHolderCorner.Parent = CheckEggHolder
+    print("[YOKUDO] New Humanoid:", NewHumanoid)
 
-local CheckEggHolderStroke = Instance.new("UIStroke")
-CheckEggHolderStroke.Color = Color3.fromRGB(105, 90, 190)
-CheckEggHolderStroke.Thickness = 1.5
-CheckEggHolderStroke.Transparency = 0.4
-CheckEggHolderStroke.Parent = CheckEggHolder
-
-local CheckEggLabel = Instance.new("TextLabel")
-CheckEggLabel.Size = UDim2.new(1, -140, 1, 0)
-CheckEggLabel.Position = UDim2.new(0, 12, 0, 0)
-CheckEggLabel.BackgroundTransparency = 1
-CheckEggLabel.Text = "Start Check Egg"
-CheckEggLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
-CheckEggLabel.TextSize = 13
-CheckEggLabel.TextXAlignment = Enum.TextXAlignment.Left
-CheckEggLabel.TextYAlignment = Enum.TextYAlignment.Center
-CheckEggLabel.Font = Enum.Font.GothamBold
-CheckEggLabel.Parent = CheckEggHolder
-
-local CheckEggCount = Instance.new("TextLabel")
-CheckEggCount.Size = UDim2.new(0, 80, 1, 0)
-CheckEggCount.Position = UDim2.new(1, -150, 0, 0)
-CheckEggCount.BackgroundTransparency = 1
-CheckEggCount.Text = "Egg: 0"
-CheckEggCount.TextColor3 = Color3.fromRGB(100, 255, 100)
-CheckEggCount.TextSize = 10
-CheckEggCount.TextXAlignment = Enum.TextXAlignment.Right
-CheckEggCount.TextYAlignment = Enum.TextYAlignment.Center
-CheckEggCount.Font = Enum.Font.Gotham
-CheckEggCount.Parent = CheckEggHolder
-
-local CheckEggCheckButton = Instance.new("TextButton")
-CheckEggCheckButton.Size = UDim2.new(0, 30, 0, 30)
-CheckEggCheckButton.Position = UDim2.new(1, -40, 0.5, -15)
-CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-CheckEggCheckButton.BackgroundTransparency = 0.85
-CheckEggCheckButton.BorderSizePixel = 0
-CheckEggCheckButton.Text = ""
-CheckEggCheckButton.AutoButtonColor = false
-CheckEggCheckButton.Parent = CheckEggHolder
-
-local CheckEggCorner = Instance.new("UICorner")
-CheckEggCorner.CornerRadius = UDim.new(0, 8)
-CheckEggCorner.Parent = CheckEggCheckButton
-
-local CheckEggStroke = Instance.new("UIStroke")
-CheckEggStroke.Color = Color3.fromRGB(255, 255, 255)
-CheckEggStroke.Thickness = 2
-CheckEggStroke.Parent = CheckEggCheckButton
-
-local CheckEggCheck = Instance.new("TextLabel")
-CheckEggCheck.Size = UDim2.new(1, 0, 1, 0)
-CheckEggCheck.BackgroundTransparency = 1
-CheckEggCheck.Text = "✓"
-CheckEggCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
-CheckEggCheck.TextSize = 20
-CheckEggCheck.Font = Enum.Font.GothamBold
-CheckEggCheck.Visible = false
-CheckEggCheck.Parent = CheckEggCheckButton
-
-local CheckEggEnabled = false
-local EggScrollFrame = nil
-
-local function CreateEggEntry(EggModel)
-    local AssetCategory = FindAssetCategory(EggModel)
-    if not AssetCategory then return nil end
-    
-    local Data = GetPetData(AssetCategory)
-    if not Data then return nil end
-    
-    local Scale = EggModel:GetAttribute("AssetScale") or 1
-    local Mutations = EggModel:GetAttribute("Mutations") or {}
-    local RealRate = CalculateRatePerSecond(Data.EarningRate, Scale, Mutations)
-    local EggId = EggModel.Name
-    
-    -- Entry (កាតចុចបានទាំងមូល)
-    local Entry = Instance.new("TextButton")
-    Entry.Size = UDim2.new(1, -8, 0, 44)
-    Entry.BackgroundColor3 = Color3.fromRGB(30, 31, 45)
-    Entry.BorderSizePixel = 0
-    Entry.Text = ""
-    Entry.AutoButtonColor = false
-    Entry.Parent = EggScrollFrame
-    
-    local EntryCorner = Instance.new("UICorner")
-    EntryCorner.CornerRadius = UDim.new(0, 6)
-    EntryCorner.Parent = Entry
-    
-    local EntryStroke = Instance.new("UIStroke")
-    EntryStroke.Color = Color3.fromRGB(105, 90, 190)
-    EntryStroke.Thickness = 1
-    EntryStroke.Transparency = 0.7
-    EntryStroke.Parent = Entry
-    
-    -- Icon
-    local IconFrame = Instance.new("Frame")
-    IconFrame.Size = UDim2.new(0, 34, 0, 34)
-    IconFrame.Position = UDim2.new(0, 5, 0.5, -17)
-    IconFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 58)
-    IconFrame.BorderSizePixel = 0
-    IconFrame.Parent = Entry
-    
-    local IconCorner = Instance.new("UICorner")
-    IconCorner.CornerRadius = UDim.new(0, 6)
-    IconCorner.Parent = IconFrame
-    
-    local IconImage = Instance.new("ImageLabel")
-    IconImage.Size = UDim2.new(1, -4, 1, -4)
-    IconImage.Position = UDim2.new(0, 2, 0, 2)
-    IconImage.BackgroundTransparency = 1
-    IconImage.Image = Data.Icon or ""
-    IconImage.Parent = IconFrame
-    
-    local ImageCorner = Instance.new("UICorner")
-    ImageCorner.CornerRadius = UDim.new(0, 6)
-    ImageCorner.Parent = IconImage
-    
-    -- Name
-    local NameLabel = Instance.new("TextLabel")
-    NameLabel.Size = UDim2.new(1, -50, 0, 16)
-    NameLabel.Position = UDim2.new(0, 48, 0, 6)
-    NameLabel.BackgroundTransparency = 1
-    NameLabel.Text = Data.DisplayName
-    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NameLabel.TextSize = 11
-    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    NameLabel.Font = Enum.Font.GothamBold
-    NameLabel.Parent = Entry
-    
-    -- Rate
-    local RateLabel = Instance.new("TextLabel")
-    RateLabel.Size = UDim2.new(1, -50, 0, 14)
-    RateLabel.Position = UDim2.new(0, 48, 0, 24)
-    RateLabel.BackgroundTransparency = 1
-    RateLabel.Text = "$" .. FormatMoney(RealRate) .. "/s"
-    RateLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    RateLabel.TextSize = 10
-    RateLabel.TextXAlignment = Enum.TextXAlignment.Left
-    RateLabel.Font = Enum.Font.Gotham
-    RateLabel.Parent = Entry
-    
-    -- Click Card → Load ភ្លាមៗទៅ Feature 1
-    Entry.MouseButton1Click:Connect(function()
-        -- Animation ពេល Click
-        TweenService:Create(Entry, TweenInfo.new(0.1), {
-            BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-        }):Play()
-        
-        task.wait(0.1)
-        
-        TweenService:Create(Entry, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(30, 31, 45)
-        }):Play()
-        
-        -- Load ទៅ Feature 1 ភ្លាម
-        UpdateGetEggBox(Data.Icon, Data.DisplayName, RealRate, EggId)
+    --==================================================
+    -- RESTORE JUMP PROPERTIES
+    --==================================================
+    pcall(function()
+        NewHumanoid.UseJumpPower = SavedJumpProperties.UseJumpPower
     end)
-    
-    -- Hover Animation
-    Entry.MouseEnter:Connect(function()
-        TweenService:Create(EntryStroke, TweenInfo.new(0.15), {
-            Transparency = 0.2,
-            Color = Color3.fromRGB(135, 120, 225)
-        }):Play()
+    pcall(function()
+        NewHumanoid.JumpPower = SavedJumpProperties.JumpPower
     end)
-    
-    Entry.MouseLeave:Connect(function()
-        TweenService:Create(EntryStroke, TweenInfo.new(0.15), {
-            Transparency = 0.7,
-            Color = Color3.fromRGB(105, 90, 190)
-        }):Play()
+    pcall(function()
+        NewHumanoid.JumpHeight = SavedJumpProperties.JumpHeight
     end)
-    
-    return Entry
-end
 
-local function RefreshEggList()
-    if not CheckEggEnabled then return end
-    
-    for _, child in ipairs(EggScrollFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
+    --==================================================
+    -- RESTORE EVALUATE STATE MACHINE
+    --==================================================
+    pcall(function()
+        if SavedEvaluateStateMachine ~= nil then
+            NewHumanoid.EvaluateStateMachine = SavedEvaluateStateMachine
+        end
+    end)
+
+    --==================================================
+    -- RESTORE HUMANOID STATE SETTINGS
+    --==================================================
+    for State, Enabled in pairs(SavedStates) do
+        pcall(function()
+            NewHumanoid:SetStateEnabled(State, Enabled)
+        end)
+    end
+
+    --==================================================
+    -- ENSURE ANIMATOR
+    --==================================================
+    local Animator = NewHumanoid:FindFirstChildOfClass("Animator")
+    if not Animator then
+        Animator = Instance.new("Animator")
+        Animator.Parent = NewHumanoid
+    end
+    print("[YOKUDO] Animator:", Animator)
+
+    --==================================================
+    -- RESTART ANIMATE
+    --==================================================
+    local Animate = Character:FindFirstChild("Animate")
+    if Animate then
+        print("[YOKUDO] Restarting Animate...")
+        pcall(function()
+            Animate.Disabled = true
+        end)
+        task.wait()
+        pcall(function()
+            Animate.Disabled = false
+        end)
+        print("[YOKUDO] Animate restarted")
+    end
+
+    task.wait(0.15)
+
+    --==================================================
+    -- ANTI DEATH FUNCTIONS
+    --==================================================
+    local function LockHealth()
+        if GodMode and NewHumanoid and NewHumanoid.Parent then
+            pcall(function()
+                NewHumanoid.MaxHealth = math.huge
+                NewHumanoid.Health = math.huge
+            end)
         end
     end
-    
-    local EggDataList = {}
-    
-    for _, child in ipairs(Container:GetChildren()) do
-        if child:IsA("Model") then
-            local AssetCategory = FindAssetCategory(child)
-            if AssetCategory then
-                local Data = GetPetData(AssetCategory)
-                if Data then
-                    local Scale = child:GetAttribute("AssetScale") or 1
-                    local Mutations = child:GetAttribute("Mutations") or {}
-                    local RealRate = CalculateRatePerSecond(Data.EarningRate, Scale, Mutations)
-                    table.insert(EggDataList, {
-                        Model = child,
-                        Data = Data,
-                        Rate = RealRate
-                    })
+
+    local function BlockDeathState()
+        if not NewHumanoid or not NewHumanoid.Parent then return end
+        pcall(function()
+            NewHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+        end)
+        pcall(function()
+            NewHumanoid.BreakJointsOnDeath = false
+        end)
+        pcall(function()
+            NewHumanoid.RequiresNeck = false
+        end)
+    end
+
+    local function BindAntiDeath(Humanoid)
+        if not Humanoid then return end
+        Humanoid.HealthChanged:Connect(function(Health)
+            if GodMode and Humanoid and Humanoid.Parent then
+                if Health < Humanoid.MaxHealth then
+                    pcall(function()
+                        Humanoid.Health = Humanoid.MaxHealth
+                    end)
                 end
             end
-        end
+        end)
+        Humanoid.Died:Connect(function()
+            if GodMode and Humanoid and Humanoid.Parent then
+                pcall(function()
+                    Humanoid.Health = Humanoid.MaxHealth
+                end)
+            end
+        end)
     end
-    
-    table.sort(EggDataList, function(a, b)
-        return a.Rate > b.Rate
-    end)
-    
-    for _, EggData in ipairs(EggDataList) do
-        CreateEggEntry(EggData.Model)
-    end
-    
-    EggScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #EggDataList * 48)
-    CheckEggCount.Text = "Egg: " .. #EggDataList
-end
 
-local function ToggleCheckEgg()
-    CheckEggEnabled = not CheckEggEnabled
-    CheckEggCheck.Visible = CheckEggEnabled
-    if CheckEggEnabled then
-        CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-        CheckEggCheckButton.BackgroundTransparency = 0
-        CheckEggStroke.Color = Color3.fromRGB(135, 120, 225)
-        RefreshEggList()
-    else
-        CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        CheckEggCheckButton.BackgroundTransparency = 0.85
-        CheckEggStroke.Color = Color3.fromRGB(255, 255, 255)
-        for _, child in ipairs(EggScrollFrame:GetChildren()) do
-            if child:IsA("TextButton") then
-                child:Destroy()
+    LockHealth()
+    BlockDeathState()
+    BindAntiDeath(NewHumanoid)
+
+    task.spawn(function()
+        while task.wait(0.1) do
+            if GodMode and NewHumanoid and NewHumanoid.Parent then
+                pcall(function()
+                    if NewHumanoid.Health < NewHumanoid.MaxHealth then
+                        NewHumanoid.Health = NewHumanoid.MaxHealth
+                    end
+                    NewHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                end)
             end
         end
-        CheckEggCount.Text = "Egg: 0"
+    end)
+
+    --==================================================
+    -- CONTROL MODULE
+    --==================================================
+    local function RefreshControls()
+        local PlayerScripts = Player:FindFirstChild("PlayerScripts")
+        if not PlayerScripts then
+            warn("[YOKUDO] PlayerScripts not found")
+            return
+        end
+        local PlayerModule = PlayerScripts:FindFirstChild("PlayerModule")
+        if not PlayerModule then
+            warn("[YOKUDO] PlayerModule not found")
+            return
+        end
+        local Success, Module = pcall(function()
+            return require(PlayerModule)
+        end)
+        if not Success or not Module then
+            warn("[YOKUDO] Failed to require PlayerModule")
+            return
+        end
+        local Controls
+        pcall(function()
+            Controls = Module:GetControls()
+        end)
+        if not Controls then
+            warn("[YOKUDO] Controls not found")
+            return
+        end
+        pcall(function()
+            Controls:OnCharacterAdded(Character)
+        end)
+        task.wait()
+        pcall(function()
+            Controls:UpdateActiveControlModuleEnabled()
+        end)
+        task.wait()
+        print("[YOKUDO] Controls Humanoid:", Controls.humanoid)
+        print("[YOKUDO] Same Humanoid:", Controls.humanoid == NewHumanoid)
     end
+
+    RefreshControls()
+
+    --==================================================
+    -- CAMERA
+    --==================================================
+    pcall(function()
+        local Camera = workspace.CurrentCamera
+        if Camera then
+            Camera.CameraSubject = NewHumanoid
+        end
+    end)
+
+    --==================================================
+    -- FINAL STATE RESTORE
+    --==================================================
+    task.wait(0.25)
+
+    if not Character.Parent then
+        return
+    end
+
+    local CurrentHumanoid = Character:FindFirstChildOfClass("Humanoid")
+    if CurrentHumanoid ~= NewHumanoid then
+        return
+    end
+
+    pcall(function()
+        NewHumanoid.UseJumpPower = SavedJumpProperties.UseJumpPower
+    end)
+    pcall(function()
+        NewHumanoid.JumpPower = SavedJumpProperties.JumpPower
+    end)
+    pcall(function()
+        NewHumanoid.JumpHeight = SavedJumpProperties.JumpHeight
+    end)
+    pcall(function()
+        if SavedEvaluateStateMachine ~= nil then
+            NewHumanoid.EvaluateStateMachine = SavedEvaluateStateMachine
+        end
+    end)
+
+    for State, Enabled in pairs(SavedStates) do
+        pcall(function()
+            NewHumanoid:SetStateEnabled(State, Enabled)
+        end)
+    end
+
+    LockHealth()
+    BlockDeathState()
+    RefreshControls()
+
+    pcall(function()
+        local Camera = workspace.CurrentCamera
+        if Camera then
+            Camera.CameraSubject = NewHumanoid
+        end
+    end)
+
+    --==================================================
+    -- FINAL ANIMATE RESTART
+    --==================================================
+    local CurrentAnimate = Character:FindFirstChild("Animate")
+    if CurrentAnimate then
+        pcall(function()
+            CurrentAnimate.Disabled = true
+        end)
+        task.wait()
+        pcall(function()
+            CurrentAnimate.Disabled = false
+        end)
+    end
+
+    print("")
+    print("========================================")
+    print("[YOKUDO] HUMANOID REPLACE + ANTI DEATH COMPLETE")
+    print("========================================")
 end
 
-CheckEggCheckButton.MouseButton1Click:Connect(function()
-    ToggleCheckEgg()
+-- ==================================================
+-- AUTO RE-RUN ON CHARACTER ADDED
+-- ==================================================
+Player.CharacterAdded:Connect(function(Character)
+    task.wait(1) -- រង់ចាំ Character Load
+    RunBypassAntiCheat()
+    print("[YOKUDO] Bypass Anti Cheat: Re-applied on new Character")
 end)
 
 -- ==================================================
--- EGG LIST
+-- RUN IMMEDIATELY
 -- ==================================================
-EggScrollFrame = Instance.new("ScrollingFrame")
-EggScrollFrame.Size = UDim2.new(1, 0, 0, 200)
-EggScrollFrame.BackgroundTransparency = 1
-EggScrollFrame.BorderSizePixel = 0
-EggScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-EggScrollFrame.ScrollBarThickness = 4
-EggScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(200, 200, 220)
-EggScrollFrame.LayoutOrder = 4
-EggScrollFrame.Parent = AutoFarmingPage
-
-local EggListLayout = Instance.new("UIListLayout")
-EggListLayout.Padding = UDim.new(0, 4)
-EggListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-EggListLayout.Parent = EggScrollFrame
-
-Container.ChildAdded:Connect(function()
-    task.wait(0.2)
-    if CheckEggEnabled then
-        RefreshEggList()
-    end
-end)
-
-Container.ChildRemoved:Connect(function()
-    task.wait(0.2)
-    if CheckEggEnabled then
-        RefreshEggList()
-    end
-end)
-
 task.spawn(function()
-    while task.wait(1) do
-        if CheckEggEnabled then
-            RefreshEggList()
-        end
-    end
+    task.wait(1)
+    RunBypassAntiCheat()
 end)
 
-print("✅ Auto Farming Tab Loaded")
+print("✅ BypassAntiCheat Feature Loaded")
