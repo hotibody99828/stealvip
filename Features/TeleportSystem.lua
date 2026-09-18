@@ -1,7 +1,7 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
 -- Egg Collect + Fast Return to Safe
--- Camera Lock + Reset on 2nd Egg
+-- Top-Down Camera + Lock
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -28,8 +28,8 @@ end)
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1100
-local RETURN_SPEED = 900
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -38,9 +38,11 @@ local SAFE_LOCK_DISTANCE = 3
 local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 1
 
-local CAMERA_DISTANCE = 1.5
-local CAMERA_ZOOM_STEP = 0.3
-local CAMERA_MIN_DISTANCE = 4.0
+-- CAMERA SETTINGS (Top-Down View)
+local CAMERA_HEIGHT = 8        -- កម្ពស់ Camera ពីលើ Egg
+local CAMERA_DISTANCE = 0      -- ចម្ងាយពី Egg (0 = មើលពីលើតែម្តង)
+local CAMERA_ZOOM_STEP = 0.5   -- Zoom បន្ថែមពេលមិនឃើញ Hover
+local CAMERA_MIN_HEIGHT = 3    -- កម្ពស់អប្បបរមា
 local LOCK_WAIT = 0.2
 
 local LOOP_INTERVAL = 0.02
@@ -59,7 +61,7 @@ local TargetEgg = nil
 local TargetPromptPart = nil
 local TargetHover = nil
 local LockStartTime = 0
-local CurrentZoom = CAMERA_DISTANCE
+local CurrentCameraHeight = CAMERA_HEIGHT
 local SavedYBefore = nil
 local CollectDone = false
 local RetryStartTime = 0
@@ -241,9 +243,9 @@ local function FindSmartPromptNearTarget(EggPos)
 end
 
 -- ==================================================
--- CAMERA FORCE (Lock ជាប់)
+-- CAMERA FORCE (Top-Down View - មើលពីលើ)
 -- ==================================================
-local function ForceCameraToEgg(EggPos, Distance)
+local function ForceCameraToEgg(EggPos, Height)
     if not Camera then return end
 
     if OriginalCameraSubject == nil then
@@ -253,8 +255,8 @@ local function ForceCameraToEgg(EggPos, Distance)
     Camera.CameraType = Enum.CameraType.Scriptable
     CameraLocked = true
 
-    local D = Distance or CAMERA_DISTANCE
-    local CamPos = EggPos + Vector3.new(0, D * 0.5, D)
+    local H = Height or CAMERA_HEIGHT
+    local CamPos = EggPos + Vector3.new(0, H, 0) -- មើលពីលើចុះក្រោម
 
     Camera.CFrame = CFrame.new(CamPos, EggPos)
     Camera.Focus = CFrame.new(EggPos)
@@ -421,7 +423,7 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
 end
 
 -- ==================================================
--- FLY TO SAFE ZONE (Reset Camera មុនពេល Fly)
+-- FLY TO SAFE ZONE
 -- ==================================================
 local function FlyToSafeZone()
     GoingToSafe = true
@@ -431,7 +433,6 @@ local function FlyToSafeZone()
     ResetCamera()
 
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
-        -- ដល់ Safe Zone - មិន Reset Camera ទេ (Reset រួចហើយ)
         CurrentStep = "stop"
     end)
 end
@@ -450,7 +451,7 @@ local function ResetStateRetry()
     WaitingRetry = false
     RetryStartTime = 0
     GoingToSafe = false
-    -- មិន Reset CurrentZoom ទេ - រក្សា Zoom ជាប់
+    -- មិន Reset CurrentCameraHeight ទេ - រក្សា Zoom ជាប់
     -- មិន Reset Camera ទេ - រក្សា Camera Lock ជាប់
 
     CleanupMovers()
@@ -470,7 +471,7 @@ local function FullReset()
     TargetPromptPart = nil
     TargetHover = nil
     LockStartTime = 0
-    CurrentZoom = CAMERA_DISTANCE
+    CurrentCameraHeight = CAMERA_HEIGHT
     SavedYBefore = nil
     CollectDone = false
     WaitingRetry = false
@@ -517,11 +518,9 @@ local function StartActiveHeartbeat()
 
             if Elapsed >= RETRY_WAIT then
                 if CollectCount >= COLLECT_TARGET then
-                    -- Done all -> Fly to Safe
                     WaitingRetry = false
                     FlyToSafeZone()
                 else
-                    -- Retry (Round #2) - មិន Reset Camera
                     ResetStateRetry()
                 end
             end
@@ -544,10 +543,8 @@ local function StartActiveHeartbeat()
                 CollectCount = CollectCount + 1
 
                 if CollectCount >= COLLECT_TARGET then
-                    -- Done all -> Fly Safe IMMEDIATELY
                     FlyToSafeZone()
                 else
-                    -- Retry (Round #2)
                     WaitingRetry = true
                     RetryStartTime = tick()
                 end
@@ -575,7 +572,7 @@ local function StartActiveHeartbeat()
             Root.AssemblyAngularVelocity = Vector3.zero
 
             FaceEgg(EggPos)
-            ForceCameraToEgg(EggPos, CurrentZoom)
+            ForceCameraToEgg(EggPos, CurrentCameraHeight)
 
             local Elapsed = tick() - LockStartTime
 
@@ -598,9 +595,10 @@ local function StartActiveHeartbeat()
                         PromptTarget()
                     end
                 else
-                    CurrentZoom = CurrentZoom - CAMERA_ZOOM_STEP
-                    if CurrentZoom < CAMERA_MIN_DISTANCE then
-                        CurrentZoom = CAMERA_MIN_DISTANCE
+                    -- បន្ថែមកម្ពស់ Camera ដើម្បី Zoom ចេញ
+                    CurrentCameraHeight = CurrentCameraHeight + CAMERA_ZOOM_STEP
+                    if CurrentCameraHeight > CAMERA_HEIGHT * 3 then
+                        CurrentCameraHeight = CAMERA_HEIGHT * 3
                     end
                 end
             end
@@ -643,7 +641,7 @@ local function StartMainLoop()
                     TargetEgg = CachedEgg
                     TargetPromptPart = nil
                     SavedYBefore = nil
-                    -- មិន Reset CurrentZoom ទេ - រក្សា Zoom ជាប់
+                    -- មិន Reset CurrentCameraHeight ទេ - រក្សា Zoom ជាប់
 
                     CurrentStep = "to_egg"
 
@@ -704,7 +702,8 @@ local function GetState()
         TargetId = TARGET_ID,
         Hover = TargetHover ~= nil,
         Prompt = TargetPromptPart ~= nil,
-        CameraLocked = CameraLocked
+        CameraLocked = CameraLocked,
+        CameraHeight = CurrentCameraHeight
     }
 end
 
@@ -721,4 +720,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Camera Lock + Reset on 2nd Egg)")
+print("✅ TeleportSystem Feature Loaded (Top-Down Camera + Lock)")
