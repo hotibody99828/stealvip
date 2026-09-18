@@ -3,6 +3,7 @@
 -- ==================================================
 
 local TabsManager = _G.YOKUDO_TabsManager
+local TweenService = game:GetService("TweenService")
 
 local SettingTab, SettingPage = TabsManager:RegisterTab("Setting", 7, "SETTING")
 
@@ -206,7 +207,7 @@ AntiTrapCheckButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================================
--- FEATURE 3: GOD MODE (BUTTON)
+-- FEATURE 3: GOD MODE (BUTTON + NOTIFICATION)
 -- ==================================================
 local GodModeHolder = Instance.new("Frame")
 GodModeHolder.Size = UDim2.new(1, 0, 0, 52)
@@ -263,16 +264,14 @@ GodModeStroke.Parent = GodModeButton
 -- BUTTON ANIMATION (ច្បាស់)
 -- ==================================================
 GodModeButton.MouseEnter:Connect(function()
-    TweenService:Create(GodModeButton, TweenInfo.new(0.15), {
-        BackgroundColor3 = Color3.fromRGB(125, 110, 220),
-        Size = UDim2.new(0, 72, 0, 27)
+    TweenService:Create(GodModeButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        BackgroundColor3 = Color3.fromRGB(125, 110, 220)
     }):Play()
 end)
 
 GodModeButton.MouseLeave:Connect(function()
-    TweenService:Create(GodModeButton, TweenInfo.new(0.15), {
-        BackgroundColor3 = Color3.fromRGB(105, 90, 190),
-        Size = UDim2.new(0, 70, 0, 26)
+    TweenService:Create(GodModeButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        BackgroundColor3 = Color3.fromRGB(105, 90, 190)
     }):Play()
 end)
 
@@ -285,13 +284,14 @@ local function ShowNotification(Text)
     local NotifyGui = Instance.new("ScreenGui")
     NotifyGui.Name = "YokudoNotify"
     NotifyGui.ResetOnSpawn = false
+    NotifyGui.DisplayOrder = 999
     NotifyGui.Parent = PlayerGui
     
     local NotifyFrame = Instance.new("Frame")
     NotifyFrame.Size = UDim2.new(0, 220, 0, 50)
-    NotifyFrame.Position = UDim2.new(0, -250, 0, 20) -- ចាប់ផ្តើមពីឆ្វេង (ក្រៅអេក្រង់)
+    NotifyFrame.Position = UDim2.new(0, -250, 0, 20)
     NotifyFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    NotifyFrame.BackgroundTransparency = 0.7 -- Glass
+    NotifyFrame.BackgroundTransparency = 0.85
     NotifyFrame.BorderSizePixel = 0
     NotifyFrame.Parent = NotifyGui
     
@@ -302,7 +302,7 @@ local function ShowNotification(Text)
     local NotifyStroke = Instance.new("UIStroke")
     NotifyStroke.Color = Color3.fromRGB(255, 255, 255)
     NotifyStroke.Thickness = 1
-    NotifyStroke.Transparency = 0.5
+    NotifyStroke.Transparency = 0.7
     NotifyStroke.Parent = NotifyFrame
     
     local NotifyText = Instance.new("TextLabel")
@@ -344,18 +344,23 @@ end
 -- ==================================================
 -- CLICK → ENABLE GOD MODE + NOTIFY
 -- ==================================================
+GodModeButton.MouseButton1Down:Connect(function()
+    -- Button Scale Down
+    TweenService:Create(GodModeButton, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 62, 0, 23),
+        BackgroundColor3 = Color3.fromRGB(85, 70, 170)
+    }):Play()
+end)
+
+GodModeButton.MouseButton1Up:Connect(function()
+    -- Button Scale Up
+    TweenService:Create(GodModeButton, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 70, 0, 26),
+        BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+    }):Play()
+end)
+
 GodModeButton.MouseButton1Click:Connect(function()
-    -- Play Click Animation (Scale)
-    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
-        Size = UDim2.new(0, 60, 0, 22)
-    }):Play()
-    
-    task.wait(0.08)
-    
-    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
-        Size = UDim2.new(0, 70, 0, 26)
-    }):Play()
-    
     -- Enable God Mode
     if _G.YOKUDO_GodMode then
         _G.YOKUDO_GodMode.Enable()
