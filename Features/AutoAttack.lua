@@ -1,6 +1,6 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Auto Attack
--- Auto Equip Bat + Auto Fire Remote
+-- Auto Equip Bat + Auto Fire Remote (Fast + Closest)
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -28,8 +28,8 @@ end
 -- ==================================================
 -- SETTINGS
 -- ==================================================
-local HIT_RANGE = 100 -- ដូរពី 50 ទៅ 100
-local FIRE_INTERVAL = 0.5
+local HIT_RANGE = 100
+local FIRE_INTERVAL = 0.1 -- លឿនជាងមុន (ពី 0.5 → 0.1)
 
 -- ==================================================
 -- STATE
@@ -41,6 +41,7 @@ local HitConnection = nil
 local CurrentBat = nil
 local LastFire = 0
 local TraceSequence = 0
+local LastTarget = nil
 
 -- ==================================================
 -- GET HUMANOID
@@ -147,7 +148,7 @@ local function ToggleAutoEquip()
 end
 
 -- ==================================================
--- FEATURE 2: AUTO FIRE REMOTE (Range 100)
+-- FEATURE 2: AUTO FIRE REMOTE (Fast + Closest)
 -- ==================================================
 local function FindClosestPlayer()
     local Hum, Root = GetHumanoid()
@@ -163,10 +164,13 @@ local function FindClosestPlayer()
                 local otherHum = otherChar:FindFirstChildOfClass("Humanoid")
                 local otherRoot = otherChar:FindFirstChild("HumanoidRootPart")
                 if otherHum and otherRoot and otherHum.Health > 0 then
-                    local Dist = (otherRoot.Position - Root.Position).Magnitude
-                    if Dist < ClosestDist then
-                        ClosestDist = Dist
-                        Closest = otherPlayer
+                    -- Check Player ឱ្យច្បាស់
+                    if otherPlayer.Parent == Players then
+                        local Dist = (otherRoot.Position - Root.Position).Magnitude
+                        if Dist < ClosestDist then
+                            ClosestDist = Dist
+                            Closest = otherPlayer
+                        end
                     end
                 end
             end
@@ -178,7 +182,13 @@ end
 
 local function FireRemote()
     local Target = FindClosestPlayer()
-    if not Target then return end
+    if not Target then 
+        LastTarget = nil
+        return 
+    end
+    
+    -- បើ Target ដូចគ្នា → Fire ភ្លាម
+    -- បើ Target ថ្មី → Fire ភ្លាមដែរ
     
     local Remote = GetBatSwingRemote()
     if not Remote then return end
@@ -189,6 +199,8 @@ local function FireRemote()
     pcall(function()
         Remote:FireServer(Target, TraceId)
     end)
+    
+    LastTarget = Target
 end
 
 local function EnableAutoHit()
@@ -210,7 +222,7 @@ local function EnableAutoHit()
         FireRemote()
     end)
     
-    print("[YOKUDO] Auto Fire Remote (Range 100): ON")
+    print("[YOKUDO] Auto Fire Remote (Fast + Closest): ON")
 end
 
 local function DisableAutoHit()
@@ -265,4 +277,4 @@ _G.YOKUDO_AutoAttack = {
     FindClosestPlayer = FindClosestPlayer
 }
 
-print("✅ AutoAttack Feature Loaded (Fire Remote Range 100)")
+print("✅ AutoAttack Feature Loaded (Fast + Closest)")
