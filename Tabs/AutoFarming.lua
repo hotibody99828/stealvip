@@ -4,6 +4,7 @@
 
 local TabsManager = _G.YOKUDO_TabsManager
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local AutoFarmingTab, AutoFarmingPage = TabsManager:RegisterTab("Auto Farming", 4, "AUTO_FARMING")
 
@@ -16,7 +17,6 @@ local EggModels = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Models"
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
 local MeshIdToCategory = {}
-local EggDataCache = {} -- Cache សម្រាប់ Egg Data
 
 local function BuildMeshIdMap()
     for _, Config in ipairs(Configs:GetChildren()) do
@@ -43,10 +43,6 @@ end
 BuildMeshIdMap()
 
 local function GetPetData(AssetCategory)
-    if EggDataCache[AssetCategory] then
-        return EggDataCache[AssetCategory]
-    end
-    
     local Config = Configs:FindFirstChild(AssetCategory)
     if not Config then return nil end
     
@@ -67,7 +63,6 @@ local function GetPetData(AssetCategory)
         Data.Icon = Module.Icon
     end
     
-    EggDataCache[AssetCategory] = Data
     return Data
 end
 
@@ -146,6 +141,7 @@ GetEggBoxStroke.Thickness = 1.5
 GetEggBoxStroke.Transparency = 0.4
 GetEggBoxStroke.Parent = GetEggBox
 
+-- Icon
 local GetEggIcon = Instance.new("ImageLabel")
 GetEggIcon.Size = UDim2.new(0, 40, 0, 40)
 GetEggIcon.Position = UDim2.new(0, 10, 0.5, -20)
@@ -158,6 +154,7 @@ local GetEggIconCorner = Instance.new("UICorner")
 GetEggIconCorner.CornerRadius = UDim.new(0, 6)
 GetEggIconCorner.Parent = GetEggIcon
 
+-- Name
 local GetEggName = Instance.new("TextLabel")
 GetEggName.Size = UDim2.new(1, -140, 0, 16)
 GetEggName.Position = UDim2.new(0, 58, 0, 10)
@@ -169,6 +166,7 @@ GetEggName.TextXAlignment = Enum.TextXAlignment.Left
 GetEggName.Font = Enum.Font.GothamBold
 GetEggName.Parent = GetEggBox
 
+-- Rate
 local GetEggRate = Instance.new("TextLabel")
 GetEggRate.Size = UDim2.new(1, -140, 0, 16)
 GetEggRate.Position = UDim2.new(0, 58, 0, 30)
@@ -180,6 +178,7 @@ GetEggRate.TextXAlignment = Enum.TextXAlignment.Left
 GetEggRate.Font = Enum.Font.Gotham
 GetEggRate.Parent = GetEggBox
 
+-- Checkbox
 local GetEggCheckButton = Instance.new("TextButton")
 GetEggCheckButton.Size = UDim2.new(0, 34, 0, 34)
 GetEggCheckButton.Position = UDim2.new(1, -44, 0.5, -17)
@@ -212,11 +211,21 @@ GetEggCheck.Parent = GetEggCheckButton
 local SelectedEggId = nil
 local GetEggEnabled = false
 
+-- Update Box (ភ្លាមៗ)
 local function UpdateGetEggBox(Icon, Name, Rate, EggId)
     GetEggIcon.Image = Icon or ""
     GetEggName.Text = Name or "No Egg Selected"
     GetEggRate.Text = "$" .. FormatMoney(Rate or 0) .. "/s"
     SelectedEggId = EggId
+    
+    -- Animation ពេល Update
+    GetEggIcon.ImageTransparency = 1
+    GetEggName.TextTransparency = 1
+    GetEggRate.TextTransparency = 1
+    
+    TweenService:Create(GetEggIcon, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
+    TweenService:Create(GetEggName, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+    TweenService:Create(GetEggRate, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
 end
 
 local function ToggleGetEgg()
@@ -277,7 +286,6 @@ CheckEggLabel.TextYAlignment = Enum.TextYAlignment.Center
 CheckEggLabel.Font = Enum.Font.GothamBold
 CheckEggLabel.Parent = CheckEggHolder
 
--- Debug Label (បង្ហាញចំនួន Egg)
 local CheckEggCount = Instance.new("TextLabel")
 CheckEggCount.Size = UDim2.new(0, 80, 1, 0)
 CheckEggCount.Position = UDim2.new(1, -150, 0, 0)
@@ -411,26 +419,22 @@ local function CreateEggEntry(EggModel)
     SelectStroke.Parent = SelectButton
     
     SelectButton.MouseButton1Click:Connect(function()
+        -- Load ភ្លាមៗទៅ Feature 1
         UpdateGetEggBox(Data.Icon, Data.DisplayName, RealRate, EggId)
     end)
     
     return Entry
 end
 
--- ==================================================
--- REFRESH EGG LIST (លឿន)
--- ==================================================
 local function RefreshEggList()
     if not CheckEggEnabled then return end
     
-    -- សម្អាត Entry ចាស់
     for _, child in ipairs(EggScrollFrame:GetChildren()) do
         if child:IsA("Frame") then
             child:Destroy()
         end
     end
     
-    -- ប្រមូល Egg Data
     local EggDataList = {}
     
     for _, child in ipairs(Container:GetChildren()) do
@@ -452,12 +456,10 @@ local function RefreshEggList()
         end
     end
     
-    -- តម្រៀបតាម $/s ខ្ពស់ទៅទាប
     table.sort(EggDataList, function(a, b)
         return a.Rate > b.Rate
     end)
     
-    -- បង្កើត Entry
     for _, EggData in ipairs(EggDataList) do
         CreateEggEntry(EggData.Model)
     end
@@ -466,9 +468,6 @@ local function RefreshEggList()
     CheckEggCount.Text = "Egg: " .. #EggDataList
 end
 
--- ==================================================
--- TOGGLE CHECK EGG (លឿន)
--- ==================================================
 local function ToggleCheckEgg()
     CheckEggEnabled = not CheckEggEnabled
     CheckEggCheck.Visible = CheckEggEnabled
@@ -476,13 +475,11 @@ local function ToggleCheckEgg()
         CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         CheckEggCheckButton.BackgroundTransparency = 0
         CheckEggStroke.Color = Color3.fromRGB(135, 120, 225)
-        -- Check ភ្លាមៗ
         RefreshEggList()
     else
         CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         CheckEggCheckButton.BackgroundTransparency = 0.85
         CheckEggStroke.Color = Color3.fromRGB(255, 255, 255)
-        -- សម្អាត List
         for _, child in ipairs(EggScrollFrame:GetChildren()) do
             if child:IsA("Frame") then
                 child:Destroy()
@@ -514,9 +511,6 @@ EggListLayout.Padding = UDim.new(0, 4)
 EggListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 EggListLayout.Parent = EggScrollFrame
 
--- ==================================================
--- AUTO REFRESH (លឿនជាងមុន)
--- ==================================================
 Container.ChildAdded:Connect(function()
     task.wait(0.2)
     if CheckEggEnabled then
@@ -531,7 +525,6 @@ Container.ChildRemoved:Connect(function()
     end
 end)
 
--- Refresh រាល់ 1 វិនាទី (ជំនួស 3 វិនាទី)
 task.spawn(function()
     while task.wait(1) do
         if CheckEggEnabled then
