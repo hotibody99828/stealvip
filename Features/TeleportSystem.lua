@@ -141,16 +141,19 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG
+-- FIND EGG (Check ទាំង Container និង Workspace)
+-- ប្រើ TARGET_ID ដូចគ្នា ប៉ុន្តែ Path ខុសគ្នា
 -- ==================================================
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
     
+    -- Check Container មុន (AreaEggSlotsClient)
     if Container then
         local Egg = Container:FindFirstChild(TARGET_ID)
         if Egg then return Egg end
     end
     
+    -- Check Workspace
     local Egg = workspace:FindFirstChild(TARGET_ID)
     if Egg then return Egg end
     
@@ -184,11 +187,12 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER IN TARGET
+-- HOVER IN TARGET (Check ទាំង Container និង Workspace)
 -- ==================================================
 local function FindHoverInTarget()
     if not TARGET_ID then return nil end
     
+    -- Check Container
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
@@ -197,6 +201,7 @@ local function FindHoverInTarget()
         end
     end
 
+    -- Check Workspace
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
         local Hover = WSEgg:FindFirstChild("AreaEggHover")
@@ -424,17 +429,15 @@ end
 
 -- ==================================================
 -- RESET STATE RETRY (Round #1 → Round #2)
--- សម្រាប់ទាំង PC និង Mobile
 -- ==================================================
 local function ResetStateRetry()
-    -- Reset ទាំងអស់ ប៉ុន្តែរក្សា CollectCount
     TargetEgg = nil
     TargetPromptPart = nil
     TargetHover = nil
     LockStartTime = 0
     CurrentZoom = CAMERA_DISTANCE
-    SavedYBefore = nil      -- Reset ដើម្បី Y Check ថ្មី
-    CollectDone = false     -- Reset ដើម្បី Collect ថ្មី
+    SavedYBefore = nil
+    CollectDone = false
     WaitingRetry = false
     RetryStartTime = 0
     GoingToSafe = false
@@ -496,9 +499,7 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- ============================================
         -- WAIT RETRY (2s before retry)
-        -- ============================================
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
@@ -507,16 +508,13 @@ local function StartActiveHeartbeat()
                     WaitingRetry = false
                     FlyToSafeZone()
                 else
-                    -- Retry (Round #2)
                     ResetStateRetry()
                 end
             end
             return
         end
 
-        -- ============================================
         -- FAST Y CHECK (Confirm Collect)
-        -- ============================================
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
@@ -538,9 +536,7 @@ local function StartActiveHeartbeat()
             end
         end
 
-        -- ============================================
         -- LOCK + FACE + CAMERA + HOVER + PROMPT
-        -- ============================================
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
