@@ -41,7 +41,7 @@ local CONFIRM_WAIT = 0.5 -- ពេលវេលារង់ចាំដើម្�
 
 local CAMERA_HEIGHT = 3
 local CAMERA_DISTANCE = 0
-local CAMERA_ZOOM_STEP = 0.5
+local CAMERA_ZOOM_STEP = 0.10
 local CAMERA_MIN_HEIGHT = 3
 local LOCK_WAIT = 0.2
 
