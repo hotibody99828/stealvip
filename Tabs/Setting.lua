@@ -247,7 +247,7 @@ GodModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 GodModeButton.TextSize = 12
 GodModeButton.Font = Enum.Font.GothamBold
 GodModeButton.AutoButtonColor = false
-GodModeButton.ClipsDescendants = true -- សម្រាប់ Animation
+GodModeButton.ClipsDescendants = true
 GodModeButton.Parent = GodModeHolder
 
 local GodModeCorner = Instance.new("UICorner")
@@ -267,10 +267,10 @@ local AnimationFrame = Instance.new("Frame")
 AnimationFrame.Name = "AnimationFrame"
 AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
 AnimationFrame.Position = UDim2.new(1, 0, 0, 0) -- ចាប់ផ្តើមពីស្តាំ
-AnimationFrame.BackgroundColor3 = Color3.fromRGB(180, 160, 255)
-AnimationFrame.BackgroundTransparency = 0.5
+AnimationFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- ពណ៌សច្បាស់
+AnimationFrame.BackgroundTransparency = 0
 AnimationFrame.BorderSizePixel = 0
-AnimationFrame.ZIndex = 2
+AnimationFrame.ZIndex = 3 -- ខ្ពស់ជាង Button
 AnimationFrame.Parent = GodModeButton
 
 local AnimationCorner = Instance.new("UICorner")
@@ -293,21 +293,21 @@ GodModeButton.MouseLeave:Connect(function()
 end)
 
 -- ==================================================
--- SLIDE ANIMATION FUNCTION
+-- SLIDE ANIMATION FUNCTION (ច្បាស់)
 -- ==================================================
 local function PlaySlideAnimation()
     -- Reset Animation Frame
     AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
-    AnimationFrame.Position = UDim2.new(1, 0, 0, 0) -- ចាប់ផ្តើមពីស្តាំ
-    AnimationFrame.BackgroundTransparency = 0.5
+    AnimationFrame.Position = UDim2.new(1, 0, 0, 0)
+    AnimationFrame.BackgroundTransparency = 0
     
     -- រត់ពីស្តាំទៅឆ្វេង
     local SlideTween = TweenService:Create(
         AnimationFrame,
         TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
         {
-            Size = UDim2.new(1, 0, 1, 0), -- ពង្រីកពេញ
-            Position = UDim2.new(0, 0, 0, 0) -- ផ្លាស់ទៅឆ្វេង
+            Size = UDim2.new(1, 0, 1, 0),
+            Position = UDim2.new(0, 0, 0, 0)
         }
     )
     
@@ -326,11 +326,26 @@ local function PlaySlideAnimation()
         task.wait(0.2)
         
         -- Reset
-        AnimationFrame.BackgroundTransparency = 0.5
+        AnimationFrame.BackgroundTransparency = 0
         AnimationFrame.Size = UDim2.new(0, 0, 1, 0)
         AnimationFrame.Position = UDim2.new(1, 0, 0, 0)
     end)
 end
+
+-- ==================================================
+-- BUTTON CLICK ANIMATION (Scale)
+-- ==================================================
+GodModeButton.MouseButton1Down:Connect(function()
+    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
+        Size = UDim2.new(0, 65, 0, 24)
+    }):Play()
+end)
+
+GodModeButton.MouseButton1Up:Connect(function()
+    TweenService:Create(GodModeButton, TweenInfo.new(0.08), {
+        Size = UDim2.new(0, 70, 0, 26)
+    }):Play()
+end)
 
 -- ==================================================
 -- CLICK → PLAY ANIMATION + ENABLE GOD MODE
