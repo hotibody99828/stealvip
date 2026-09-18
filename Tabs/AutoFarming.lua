@@ -16,6 +16,7 @@ local EggModels = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Models"
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
 local MeshIdToCategory = {}
+local EggDataCache = {} -- Cache សម្រាប់ Egg Data
 
 local function BuildMeshIdMap()
     for _, Config in ipairs(Configs:GetChildren()) do
@@ -42,6 +43,10 @@ end
 BuildMeshIdMap()
 
 local function GetPetData(AssetCategory)
+    if EggDataCache[AssetCategory] then
+        return EggDataCache[AssetCategory]
+    end
+    
     local Config = Configs:FindFirstChild(AssetCategory)
     if not Config then return nil end
     
@@ -62,6 +67,7 @@ local function GetPetData(AssetCategory)
         Data.Icon = Module.Icon
     end
     
+    EggDataCache[AssetCategory] = Data
     return Data
 end
 
@@ -140,7 +146,6 @@ GetEggBoxStroke.Thickness = 1.5
 GetEggBoxStroke.Transparency = 0.4
 GetEggBoxStroke.Parent = GetEggBox
 
--- Icon (តូច)
 local GetEggIcon = Instance.new("ImageLabel")
 GetEggIcon.Size = UDim2.new(0, 40, 0, 40)
 GetEggIcon.Position = UDim2.new(0, 10, 0.5, -20)
@@ -153,7 +158,6 @@ local GetEggIconCorner = Instance.new("UICorner")
 GetEggIconCorner.CornerRadius = UDim.new(0, 6)
 GetEggIconCorner.Parent = GetEggIcon
 
--- Name
 local GetEggName = Instance.new("TextLabel")
 GetEggName.Size = UDim2.new(1, -140, 0, 16)
 GetEggName.Position = UDim2.new(0, 58, 0, 10)
@@ -165,7 +169,6 @@ GetEggName.TextXAlignment = Enum.TextXAlignment.Left
 GetEggName.Font = Enum.Font.GothamBold
 GetEggName.Parent = GetEggBox
 
--- Rate
 local GetEggRate = Instance.new("TextLabel")
 GetEggRate.Size = UDim2.new(1, -140, 0, 16)
 GetEggRate.Position = UDim2.new(0, 58, 0, 30)
@@ -177,7 +180,6 @@ GetEggRate.TextXAlignment = Enum.TextXAlignment.Left
 GetEggRate.Font = Enum.Font.Gotham
 GetEggRate.Parent = GetEggBox
 
--- Checkbox (ធំជាងមុន + ពណ៌ស)
 local GetEggCheckButton = Instance.new("TextButton")
 GetEggCheckButton.Size = UDim2.new(0, 34, 0, 34)
 GetEggCheckButton.Position = UDim2.new(1, -44, 0.5, -17)
@@ -264,7 +266,7 @@ CheckEggHolderStroke.Transparency = 0.4
 CheckEggHolderStroke.Parent = CheckEggHolder
 
 local CheckEggLabel = Instance.new("TextLabel")
-CheckEggLabel.Size = UDim2.new(1, -60, 1, 0)
+CheckEggLabel.Size = UDim2.new(1, -140, 1, 0)
 CheckEggLabel.Position = UDim2.new(0, 12, 0, 0)
 CheckEggLabel.BackgroundTransparency = 1
 CheckEggLabel.Text = "Start Check Egg"
@@ -275,7 +277,19 @@ CheckEggLabel.TextYAlignment = Enum.TextYAlignment.Center
 CheckEggLabel.Font = Enum.Font.GothamBold
 CheckEggLabel.Parent = CheckEggHolder
 
--- Checkbox (ធំជាងមុន + ពណ៌ស)
+-- Debug Label (បង្ហាញចំនួន Egg)
+local CheckEggCount = Instance.new("TextLabel")
+CheckEggCount.Size = UDim2.new(0, 80, 1, 0)
+CheckEggCount.Position = UDim2.new(1, -150, 0, 0)
+CheckEggCount.BackgroundTransparency = 1
+CheckEggCount.Text = "Egg: 0"
+CheckEggCount.TextColor3 = Color3.fromRGB(100, 255, 100)
+CheckEggCount.TextSize = 10
+CheckEggCount.TextXAlignment = Enum.TextXAlignment.Right
+CheckEggCount.TextYAlignment = Enum.TextYAlignment.Center
+CheckEggCount.Font = Enum.Font.Gotham
+CheckEggCount.Parent = CheckEggHolder
+
 local CheckEggCheckButton = Instance.new("TextButton")
 CheckEggCheckButton.Size = UDim2.new(0, 30, 0, 30)
 CheckEggCheckButton.Position = UDim2.new(1, -40, 0.5, -15)
@@ -374,7 +388,6 @@ local function CreateEggEntry(EggModel)
     RateLabel.Font = Enum.Font.Gotham
     RateLabel.Parent = Entry
     
-    -- Button Select (ធំជាងមុន និងច្បាស់)
     local SelectButton = Instance.new("TextButton")
     SelectButton.Size = UDim2.new(0, 70, 0, 28)
     SelectButton.Position = UDim2.new(1, -75, 0.5, -14)
@@ -397,28 +410,6 @@ local function CreateEggEntry(EggModel)
     SelectStroke.Transparency = 0.3
     SelectStroke.Parent = SelectButton
     
-    -- Button Animation
-    SelectButton.MouseEnter:Connect(function()
-        TweenService:Create(SelectButton, TweenInfo.new(0.15), {
-            BackgroundColor3 = Color3.fromRGB(125, 110, 220)
-        }):Play()
-    end)
-    SelectButton.MouseLeave:Connect(function()
-        TweenService:Create(SelectButton, TweenInfo.new(0.15), {
-            BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-        }):Play()
-    end)
-    SelectButton.MouseButton1Down:Connect(function()
-        TweenService:Create(SelectButton, TweenInfo.new(0.08), {
-            BackgroundColor3 = Color3.fromRGB(85, 70, 170)
-        }):Play()
-    end)
-    SelectButton.MouseButton1Up:Connect(function()
-        TweenService:Create(SelectButton, TweenInfo.new(0.08), {
-            BackgroundColor3 = Color3.fromRGB(125, 110, 220)
-        }):Play()
-    end)
-    
     SelectButton.MouseButton1Click:Connect(function()
         UpdateGetEggBox(Data.Icon, Data.DisplayName, RealRate, EggId)
     end)
@@ -426,15 +417,20 @@ local function CreateEggEntry(EggModel)
     return Entry
 end
 
+-- ==================================================
+-- REFRESH EGG LIST (លឿន)
+-- ==================================================
 local function RefreshEggList()
     if not CheckEggEnabled then return end
     
+    -- សម្អាត Entry ចាស់
     for _, child in ipairs(EggScrollFrame:GetChildren()) do
         if child:IsA("Frame") then
             child:Destroy()
         end
     end
     
+    -- ប្រមូល Egg Data
     local EggDataList = {}
     
     for _, child in ipairs(Container:GetChildren()) do
@@ -456,17 +452,23 @@ local function RefreshEggList()
         end
     end
     
+    -- តម្រៀបតាម $/s ខ្ពស់ទៅទាប
     table.sort(EggDataList, function(a, b)
         return a.Rate > b.Rate
     end)
     
+    -- បង្កើត Entry
     for _, EggData in ipairs(EggDataList) do
         CreateEggEntry(EggData.Model)
     end
     
     EggScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #EggDataList * 48)
+    CheckEggCount.Text = "Egg: " .. #EggDataList
 end
 
+-- ==================================================
+-- TOGGLE CHECK EGG (លឿន)
+-- ==================================================
 local function ToggleCheckEgg()
     CheckEggEnabled = not CheckEggEnabled
     CheckEggCheck.Visible = CheckEggEnabled
@@ -474,16 +476,19 @@ local function ToggleCheckEgg()
         CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         CheckEggCheckButton.BackgroundTransparency = 0
         CheckEggStroke.Color = Color3.fromRGB(135, 120, 225)
+        -- Check ភ្លាមៗ
         RefreshEggList()
     else
         CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         CheckEggCheckButton.BackgroundTransparency = 0.85
         CheckEggStroke.Color = Color3.fromRGB(255, 255, 255)
+        -- សម្អាត List
         for _, child in ipairs(EggScrollFrame:GetChildren()) do
             if child:IsA("Frame") then
                 child:Destroy()
             end
         end
+        CheckEggCount.Text = "Egg: 0"
     end
 end
 
@@ -509,17 +514,29 @@ EggListLayout.Padding = UDim.new(0, 4)
 EggListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 EggListLayout.Parent = EggScrollFrame
 
+-- ==================================================
+-- AUTO REFRESH (លឿនជាងមុន)
+-- ==================================================
 Container.ChildAdded:Connect(function()
-    task.wait(0.5)
+    task.wait(0.2)
     if CheckEggEnabled then
         RefreshEggList()
     end
 end)
 
 Container.ChildRemoved:Connect(function()
-    task.wait(0.5)
+    task.wait(0.2)
     if CheckEggEnabled then
         RefreshEggList()
+    end
+end)
+
+-- Refresh រាល់ 1 វិនាទី (ជំនួស 3 វិនាទី)
+task.spawn(function()
+    while task.wait(1) do
+        if CheckEggEnabled then
+            RefreshEggList()
+        end
     end
 end)
 
