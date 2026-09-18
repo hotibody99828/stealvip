@@ -27,8 +27,8 @@ end)
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1000
-local RETURN_SPEED = 500
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -44,12 +44,12 @@ local LOCK_WAIT = 0.2
 
 local LOOP_INTERVAL = 0.02
 local RETRY_WAIT = 2
+local COLLECT_TARGET = 2
 
 -- ==================================================
 -- STATE
 -- ==================================================
 local TARGET_ID = nil
-local COLLECT_TARGET = 2
 local CollectCount = 0
 
 local Running = false
@@ -65,7 +65,6 @@ local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
 local OriginalCameraSubject = nil
-local LastPromptFire = 0
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -150,14 +149,14 @@ local function FindEggAnywhere()
     -- Check Container មុន
     if Container then
         local Egg = Container:FindFirstChild(TARGET_ID)
-        if Egg then return Egg, "container" end
+        if Egg then return Egg end
     end
     
     -- Check Workspace
     local Egg = workspace:FindFirstChild(TARGET_ID)
-    if Egg then return Egg, "workspace" end
+    if Egg then return Egg end
     
-    return nil, nil
+    return nil
 end
 
 local function GetEggPosition(Egg)
@@ -187,17 +186,17 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER IN TARGET (Check ទាំង Container និង Workspace)
+-- HOVER IN TARGET
 -- ==================================================
 local function FindHoverInTarget()
-    if not TARGET_ID then return nil, nil end
+    if not TARGET_ID then return nil end
     
     -- Check Container
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
             local Hover = Slot:FindFirstChild("AreaEggHover")
-            if Hover then return Hover, "container" end
+            if Hover then return Hover end
         end
     end
 
@@ -205,10 +204,10 @@ local function FindHoverInTarget()
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
         local Hover = WSEgg:FindFirstChild("AreaEggHover")
-        if Hover then return Hover, "workspace" end
+        if Hover then return Hover end
     end
 
-    return nil, nil
+    return nil
 end
 
 -- ==================================================
@@ -293,25 +292,16 @@ local function FaceEgg(EggPos)
 end
 
 -- ==================================================
--- PROMPT TARGET (Fire ភ្លាម ពេលឃើញ Hover)
+-- PROMPT TARGET
 -- ==================================================
 local function PromptTarget()
-    if not TargetPromptPart then return 0 end
-    
-    local now = tick()
-    if now - LastPromptFire < 0.1 then return 0 end
-    LastPromptFire = now
-
-    local Count = 0
+    if not TargetPromptPart then return end
 
     if TargetPromptPart:IsA("ProximityPrompt") then
         pcall(function()
             fireproximityprompt(TargetPromptPart)
-            Count = Count + 1
         end)
     end
-
-    return Count
 end
 
 -- ==================================================
@@ -444,7 +434,7 @@ local function FlyToSafeZone()
 end
 
 -- ==================================================
--- RESET STATE RETRY
+-- RESET STATE RETRY (Round #1 → Round #2)
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
@@ -462,8 +452,7 @@ local function ResetStateRetry()
     ResetCamera()
 
     CurrentStep = "idle"
-
-    print("[YOKUDO] State Reset - Retry")
+    print("[YOKUDO] State Reset - Retry #" .. (CollectCount + 1))
 end
 
 -- ==================================================
@@ -516,22 +505,28 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- WAIT RETRY
+        -- ============================================
+        -- WAIT RETRY (2s before retry)
+        -- ============================================
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
             if Elapsed >= RETRY_WAIT then
                 if CollectCount >= COLLECT_TARGET then
+                    -- Done all -> Fly to Safe
                     WaitingRetry = false
                     FlyToSafeZone()
                 else
+                    -- Retry (Round #2)
                     ResetStateRetry()
                 end
             end
             return
         end
 
-        -- FAST Y CHECK (Confirm)
+        -- ============================================
+        -- FAST Y CHECK (Confirm Collect)
+        -- ============================================
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
@@ -545,15 +540,19 @@ local function StartActiveHeartbeat()
                 CollectCount = CollectCount + 1
 
                 if CollectCount >= COLLECT_TARGET then
+                    -- Done all -> Fly Safe IMMEDIATELY
                     FlyToSafeZone()
                 else
+                    -- Retry (Round #2)
                     WaitingRetry = true
                     RetryStartTime = tick()
                 end
             end
         end
 
+        -- ============================================
         -- LOCK + FACE + CAMERA + HOVER + PROMPT
+        -- ============================================
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -582,11 +581,11 @@ local function StartActiveHeartbeat()
                     SavedYBefore = Y
                 end
 
-                local Hover2, HoverPath2 = FindHoverInTarget()
+                local Hover2 = FindHoverInTarget()
 
                 if Hover2 then
                     TargetHover = Hover2
-                    -- Fire Prompt ភ្លាម ពេលឃើញ Hover
+
                     if not TargetPromptPart then
                         TargetPromptPart = FindSmartPromptNearTarget(EggPos)
                     end
@@ -612,7 +611,7 @@ local function StartActiveHeartbeat()
 end
 
 -- ==================================================
--- MAIN LOOP
+-- MAIN LOOP (Check Egg → Fly TP)
 -- ==================================================
 local function StartMainLoop()
     if MainLoop then
@@ -631,7 +630,7 @@ local function StartMainLoop()
         if GoingToSafe then return end
 
         -- Check Egg ទាំង Container និង Workspace
-        local CachedEgg, EggSource = FindEggAnywhere()
+        local CachedEgg = FindEggAnywhere()
 
         if CurrentStep == "idle" and CachedEgg then
             local EggPos = GetEggPosition(CachedEgg)
