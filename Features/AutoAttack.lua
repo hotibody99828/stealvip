@@ -1,65 +1,90 @@
 -- ==================================================
--- YOKUDO HUB | FEATURE | Auto Attack
--- Auto Equip Bat + Auto Hit Player
+-- YOKUDO HUB | FEATURE | Auto Attack (Bat)
+-- Uses Remotes.BatSwing.Trigger + ClickToMoveController
 -- ==================================================
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-local Player = Players.LocalPlayer
-local Backpack = Player:WaitForChild("Backpack")
+local LocalPlayer = Players.LocalPlayer
 
 -- ==================================================
--- SETTINGS
+-- GET REMOTES
 -- ==================================================
-local HIT_RANGE = 50
-local SWING_INTERVAL = 0.5
+local Remotes
+pcall(function()
+    Remotes = require(ReplicatedStorage.Shared.Remotes)
+end)
+
+if not Remotes or not Remotes.BatSwing then
+    warn("[YOKUDO] BatSwing Remote not found")
+    return
+end
+
+-- ==================================================
+-- GET PLAYER MODULE (ClickToMoveController)
+-- ==================================================
+local Controls = nil
+pcall(function()
+    local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts")
+    local PlayerModule = require(PlayerScripts:WaitForChild("PlayerModule"))
+    Controls = PlayerModule:GetControls()
+end)
+
+-- ==================================================
+-- CONFIG
+-- ==================================================
+local CONFIG = {
+    Range = 17,           -- (15 + 2) from BatController Config
+    Cooldown = 0.65,      -- Client cooldown 0.6s + buffer
+    AutoMove = true,      -- Auto move to target using ClickToMove
+    AutoEquip = true,     -- Auto equip Bat tool
+    MinDistance = 3,      -- Min distance to attack
+    MoveDelay = 0.1,      -- Delay before re-moving
+}
 
 -- ==================================================
 -- STATE
 -- ==================================================
-local AutoEquipEnabled = false
-local AutoHitEnabled = false
-local EquipConnection = nil
-local HitConnection = nil
-local CurrentBat = nil
-local LastSwing = 0
+local Enabled = false
+local LastAttack = 0
+local LastMove = 0
+local CurrentTarget = nil
+local BatTool = nil
+local Connection = nil
+local MoveConnection = nil
 
 -- ==================================================
 -- GET HUMANOID
 -- ==================================================
 local function GetHumanoid()
-    local Char = Player.Character
+    local Char = LocalPlayer.Character
     if not Char then return nil, nil end
-    local Hum = Char:FindFirstChildOfClass("Humanoid")
-    local Root = Char:FindFirstChild("HumanoidRootPart")
-    return Hum, Root
+    return Char:FindFirstChildOfClass("Humanoid"), Char:FindFirstChild("HumanoidRootPart")
 end
 
 -- ==================================================
 -- FIND BAT TOOL
 -- ==================================================
 local function FindBatTool()
-    -- រកក្នុង Backpack
-    for _, tool in ipairs(Backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            if tool.ToolTip == "Bat" then
-                return tool
-            end
-            if tool.Name:find("Bat") then
-                return tool
-            end
+    local Char = LocalPlayer.Character
+    if not Char then return nil end
+    
+    -- Check Character (equipped)
+    for _, child in ipairs(Char:GetChildren()) do
+        if child:IsA("Tool") and child:GetAttribute("IsBat") then
+            return child
         end
     end
     
-    -- រកក្នុង Character
-    local Char = Player.Character
-    if Char then
-        for _, tool in ipairs(Char:GetChildren()) do
-            if tool:IsA("Tool") then
-                if tool.ToolTip == "Bat" or tool.Name:find("Bat") then
-                    return tool
-                end
+    -- Check Backpack
+    local Backpack = LocalPlayer:FindFirstChild("Backpack")
+    if Backpack then
+        for _, child in ipairs(Backpack:GetChildren()) do
+            if child:IsA("Tool") and child:GetAttribute("IsBat") then
+                return child
             end
         end
     end
@@ -68,171 +93,203 @@ local function FindBatTool()
 end
 
 -- ==================================================
--- FEATURE 1: AUTO EQUIP BAT
+-- EQUIP BAT
 -- ==================================================
 local function EquipBat()
-    local Bat = FindBatTool()
-    if not Bat then return false end
+    local Hum = GetHumanoid()
+    if not Hum then return false end
     
-    if Bat.Parent == Backpack then
-        local Hum, Root = GetHumanoid()
-        if Hum then
-            Hum:EquipTool(Bat)
-            CurrentBat = Bat
+    -- Already equipped?
+    local Char = LocalPlayer.Character
+    for _, child in ipairs(Char:GetChildren()) do
+        if child:IsA("Tool") and child:GetAttribute("IsBat") then
+            BatTool = child
             return true
         end
-    elseif Bat.Parent == Player.Character then
-        CurrentBat = Bat
+    end
+    
+    -- Find and equip
+    local Tool = FindBatTool()
+    if Tool then
+        Hum:EquipTool(Tool)
+        BatTool = Tool
         return true
     end
     
     return false
 end
 
-local function EnableAutoEquip()
-    if AutoEquipEnabled then return end
-    AutoEquipEnabled = true
-    
-    if EquipConnection then
-        EquipConnection:Disconnect()
-        EquipConnection = nil
-    end
-    
-    EquipConnection = RunService.Heartbeat:Connect(function()
-        if not AutoEquipEnabled then return end
-        
-        local Bat = FindBatTool()
-        if Bat and Bat.Parent == Backpack then
-            EquipBat()
-        end
-    end)
-    
-    EquipBat()
-    print("[YOKUDO] Auto Equip Bat: ON")
-end
-
-local function DisableAutoEquip()
-    if not AutoEquipEnabled then return end
-    AutoEquipEnabled = false
-    
-    if EquipConnection then
-        EquipConnection:Disconnect()
-        EquipConnection = nil
-    end
-    
-    print("[YOKUDO] Auto Equip Bat: OFF")
-end
-
-local function ToggleAutoEquip()
-    if AutoEquipEnabled then
-        DisableAutoEquip()
-    else
-        EnableAutoEquip()
-    end
-end
-
 -- ==================================================
--- FEATURE 2: AUTO HIT PLAYER (Range 50)
+-- FIND CLOSEST TARGET
 -- ==================================================
-local function FindClosestPlayer()
+local function GetClosestTarget()
     local Hum, Root = GetHumanoid()
-    if not Root then return nil end
+    if not Hum or not Root then return nil end
+    if Hum.Health <= 0 then return nil end
     
-    local Closest = nil
-    local ClosestDist = HIT_RANGE
+    local closest = nil
+    local minDist = CONFIG.Range
     
-    for _, otherPlayer in ipairs(Players:GetPlayers()) do
-        if otherPlayer ~= Player then
-            local otherChar = otherPlayer.Character
-            if otherChar then
-                local otherHum = otherChar:FindFirstChildOfClass("Humanoid")
-                local otherRoot = otherChar:FindFirstChild("HumanoidRootPart")
-                if otherHum and otherRoot and otherHum.Health > 0 then
-                    local Dist = (otherRoot.Position - Root.Position).Magnitude
-                    if Dist < ClosestDist then
-                        ClosestDist = Dist
-                        Closest = otherRoot
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+            local targetHum = plr.Character:FindFirstChildOfClass("Humanoid")
+            
+            if targetRoot and targetHum and targetHum.Health > 0 then
+                -- Check if target is ragdolled (skip if ragdolled)
+                local isRagdolled = plr.Character:GetAttribute("IsRagdolled") 
+                    or plr:GetAttribute("RagdollEndTime")
+                
+                if not isRagdolled then
+                    local dist = (targetRoot.Position - Root.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closest = plr
                     end
                 end
             end
         end
     end
     
-    return Closest
+    return closest, minDist
 end
 
-local function HitPlayer()
-    if not CurrentBat then
-        CurrentBat = FindBatTool()
-        if not CurrentBat then return end
+-- ==================================================
+-- ATTACK TARGET
+-- ==================================================
+local function AttackTarget(Target)
+    if not Target then return false end
+    
+    local traceId = tostring(LocalPlayer.UserId) .. ":" .. tostring(tick()) .. ":" .. tostring(math.floor(tick() * 1000))
+    
+    local success, err = pcall(function()
+        Remotes.BatSwing.Trigger:FireServer(Target, traceId)
+    end)
+    
+    if success then
+        LastAttack = tick()
+        return true
+    else
+        warn("[YOKUDO] Attack failed: " .. tostring(err))
+        return false
+    end
+end
+
+-- ==================================================
+-- MOVE TO TARGET (using ClickToMoveController)
+-- ==================================================
+local function MoveToTarget(Target)
+    if not CONFIG.AutoMove then return end
+    if not Controls then return end
+    if tick() - LastMove < CONFIG.MoveDelay then return end
+    
+    local targetRoot = Target.Character and Target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+    
+    LastMove = tick()
+    
+    pcall(function()
+        Controls:MoveTo(targetRoot.Position, false)
+    end)
+end
+
+-- ==================================================
+-- MAIN LOOP
+-- ==================================================
+local function StartLoop()
+    if Connection then
+        Connection:Disconnect()
+        Connection = nil
     end
     
-    local Target = FindClosestPlayer()
-    if Target then
+    Connection = RunService.Heartbeat:Connect(function()
+        if not Enabled then return end
+        
         local Hum, Root = GetHumanoid()
-        if Root then
-            local Direction = (Target.Position - Root.Position)
-            local FlatDir = Vector3.new(Direction.X, 0, Direction.Z)
-            if FlatDir.Magnitude > 0.1 then
-                Root.CFrame = CFrame.new(Root.Position, Root.Position + FlatDir.Unit)
+        if not Hum or Hum.Health <= 0 then return end
+        
+        -- Auto Equip
+        if CONFIG.AutoEquip then
+            local equipped = false
+            for _, child in ipairs(LocalPlayer.Character:GetChildren()) do
+                if child:IsA("Tool") and child:GetAttribute("IsBat") then
+                    equipped = true
+                    BatTool = child
+                    break
+                end
+            end
+            
+            if not equipped then
+                EquipBat()
+                return
             end
         end
         
+        -- Check cooldown
+        if tick() - LastAttack < CONFIG.Cooldown then return end
+        
+        -- Find target
+        local target, dist = GetClosestTarget()
+        if target then
+            CurrentTarget = target
+            
+            -- If too far, move closer
+            if dist > CONFIG.MinDistance and CONFIG.AutoMove then
+                MoveToTarget(target)
+            end
+            
+            -- Attack if in range
+            if dist <= CONFIG.Range then
+                AttackTarget(target)
+            end
+        else
+            CurrentTarget = nil
+        end
+    end)
+end
+
+-- ==================================================
+-- ENABLE / DISABLE
+-- ==================================================
+local function Enable()
+    Enabled = true
+    LastAttack = 0
+    LastMove = 0
+    StartLoop()
+    print("[YOKUDO] Auto Attack: ON")
+end
+
+local function Disable()
+    Enabled = false
+    CurrentTarget = nil
+    if Connection then
+        Connection:Disconnect()
+        Connection = nil
+    end
+    if Controls then
         pcall(function()
-            CurrentBat:Activate()
+            Controls:MoveTo(LocalPlayer.Character.HumanoidRootPart.Position, false)
         end)
     end
+    print("[YOKUDO] Auto Attack: OFF")
 end
 
-local function EnableAutoHit()
-    if AutoHitEnabled then return end
-    AutoHitEnabled = true
-    
-    if HitConnection then
-        HitConnection:Disconnect()
-        HitConnection = nil
-    end
-    
-    HitConnection = RunService.Heartbeat:Connect(function()
-        if not AutoHitEnabled then return end
-        
-        local now = tick()
-        if now - LastSwing < SWING_INTERVAL then return end
-        LastSwing = now
-        
-        HitPlayer()
-    end)
-    
-    print("[YOKUDO] Auto Hit Player: ON")
-end
-
-local function DisableAutoHit()
-    if not AutoHitEnabled then return end
-    AutoHitEnabled = false
-    
-    if HitConnection then
-        HitConnection:Disconnect()
-        HitConnection = nil
-    end
-    
-    print("[YOKUDO] Auto Hit Player: OFF")
-end
-
-local function ToggleAutoHit()
-    if AutoHitEnabled then
-        DisableAutoHit()
+local function Toggle()
+    if Enabled then
+        Disable()
     else
-        EnableAutoHit()
+        Enable()
     end
 end
 
 -- ==================================================
--- AUTO RE-EQUIP ON CHARACTER ADDED
+-- AUTO RE-APPLY ON CHARACTER ADDED
 -- ==================================================
-Player.CharacterAdded:Connect(function()
-    if AutoEquipEnabled then
+LocalPlayer.CharacterAdded:Connect(function()
+    if Enabled then
         task.wait(1)
         EquipBat()
+        StartLoop()
     end
 end)
 
@@ -240,20 +297,16 @@ end)
 -- EXPORT
 -- ==================================================
 _G.YOKUDO_AutoAttack = {
-    -- Auto Equip
-    ToggleAutoEquip = ToggleAutoEquip,
-    EnableAutoEquip = EnableAutoEquip,
-    DisableAutoEquip = DisableAutoEquip,
-    IsAutoEquipEnabled = function() return AutoEquipEnabled end,
-    
-    -- Auto Hit
-    ToggleAutoHit = ToggleAutoHit,
-    EnableAutoHit = EnableAutoHit,
-    DisableAutoHit = DisableAutoHit,
-    IsAutoHitEnabled = function() return AutoHitEnabled end,
-    
-    -- Utils
-    FindBatTool = FindBatTool
+    Toggle = Toggle,
+    Enable = Enable,
+    Disable = Disable,
+    IsEnabled = function() return Enabled end,
+    SetRange = function(v) CONFIG.Range = v end,
+    SetCooldown = function(v) CONFIG.Cooldown = v end,
+    SetAutoMove = function(v) CONFIG.AutoMove = v end,
+    SetAutoEquip = function(v) CONFIG.AutoEquip = v end,
+    GetTarget = function() return CurrentTarget end,
+    GetConfig = function() return CONFIG end,
 }
 
-print("✅ AutoAttack Feature Loaded (2 Features)")
+print("✅ AutoAttack Feature Loaded")
