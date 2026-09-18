@@ -1,312 +1,242 @@
 -- ==================================================
--- YOKUDO HUB | FEATURE | Auto Attack (Bat)
--- Uses Remotes.BatSwing.Trigger + ClickToMoveController
+-- YOKUDO HUB | STEAL AN EGG | Loader
 -- ==================================================
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local BASE_URL = "https://raw.githubusercontent.com/hotibody99828/stealvip/main/"
 
-local LocalPlayer = Players.LocalPlayer
+_G.YOKUDO_EnablePrint = true
+
+local oldPrint = print
+print = function(...)
+    if _G.YOKUDO_EnablePrint then
+        oldPrint(...)
+    end
+end
+
+print("🔵 Loading YOKUDO HUB...")
 
 -- ==================================================
--- GET REMOTES
+-- CACHE SYSTEM
 -- ==================================================
-local Remotes
-pcall(function()
-    Remotes = require(ReplicatedStorage.Shared.Remotes)
-end)
+_G.YOKUDO_Cache = _G.YOKUDO_Cache or {}
 
-if not Remotes or not Remotes.BatSwing then
-    warn("[YOKUDO] BatSwing Remote not found")
-    return
+local function GetScript(path)
+    local fullPath = BASE_URL .. path
+    if _G.YOKUDO_Cache[fullPath] then
+        return _G.YOKUDO_Cache[fullPath]
+    end
+    local script = game:HttpGet(fullPath)
+    _G.YOKUDO_Cache[fullPath] = script
+    return script
 end
 
 -- ==================================================
--- GET PLAYER MODULE (ClickToMoveController)
+-- WAIT UNTIL GAME IS LOADED
 -- ==================================================
-local Controls = nil
-pcall(function()
-    local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts")
-    local PlayerModule = require(PlayerScripts:WaitForChild("PlayerModule"))
-    Controls = PlayerModule:GetControls()
-end)
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+
+local Player = game.Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+print("✅ Game loaded, Player: " .. Player.Name)
 
 -- ==================================================
--- CONFIG
+-- CREATE LOADING SCREEN
 -- ==================================================
-local CONFIG = {
-    Range = 17,           -- (15 + 2) from BatController Config
-    Cooldown = 0.65,      -- Client cooldown 0.6s + buffer
-    AutoMove = true,      -- Auto move to target using ClickToMove
-    AutoEquip = true,     -- Auto equip Bat tool
-    MinDistance = 3,      -- Min distance to attack
-    MoveDelay = 0.1,      -- Delay before re-moving
-}
+local function CreateLoadingScreen()
+    local LoadingGui = Instance.new("ScreenGui")
+    LoadingGui.Name = "LoadingScreen"
+    LoadingGui.ResetOnSpawn = false
+    LoadingGui.IgnoreGuiInset = true
+    LoadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    LoadingGui.DisplayOrder = 9999
+    LoadingGui.Parent = CoreGui
 
--- ==================================================
--- STATE
--- ==================================================
-local Enabled = false
-local LastAttack = 0
-local LastMove = 0
-local CurrentTarget = nil
-local BatTool = nil
-local Connection = nil
-local MoveConnection = nil
+    local Container = Instance.new("Frame")
+    Container.Name = "Container"
+    Container.Size = UDim2.new(0, 280, 0, 110)
+    Container.Position = UDim2.new(0.5, -140, 0.5, -55)
+    Container.BackgroundColor3 = Color3.fromRGB(16, 17, 23)
+    Container.BackgroundTransparency = 0.1
+    Container.BorderSizePixel = 0
+    Container.ClipsDescendants = true
+    Container.Parent = LoadingGui
 
--- ==================================================
--- GET HUMANOID
--- ==================================================
-local function GetHumanoid()
-    local Char = LocalPlayer.Character
-    if not Char then return nil, nil end
-    return Char:FindFirstChildOfClass("Humanoid"), Char:FindFirstChild("HumanoidRootPart")
-end
+    local ContainerCorner = Instance.new("UICorner")
+    ContainerCorner.CornerRadius = UDim.new(0, 14)
+    ContainerCorner.Parent = Container
 
--- ==================================================
--- FIND BAT TOOL
--- ==================================================
-local function FindBatTool()
-    local Char = LocalPlayer.Character
-    if not Char then return nil end
-    
-    -- Check Character (equipped)
-    for _, child in ipairs(Char:GetChildren()) do
-        if child:IsA("Tool") and child:GetAttribute("IsBat") then
-            return child
+    local ContainerBorder = Instance.new("UIStroke")
+    ContainerBorder.Color = Color3.fromRGB(105, 90, 190)
+    ContainerBorder.Thickness = 2
+    ContainerBorder.Transparency = 0.2
+    ContainerBorder.Parent = Container
+
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, -30, 0, 28)
+    Title.Position = UDim2.new(0, 15, 0, 8)
+    Title.BackgroundTransparency = 1
+    Title.Text = "YOKUDO HUB"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 20
+    Title.TextXAlignment = Enum.TextXAlignment.Center
+    Title.TextYAlignment = Enum.TextYAlignment.Center
+    Title.Font = Enum.Font.GothamBold
+    Title.Parent = Container
+
+    local Subtitle = Instance.new("TextLabel")
+    Subtitle.Name = "Subtitle"
+    Subtitle.Size = UDim2.new(1, -30, 0, 14)
+    Subtitle.Position = UDim2.new(0, 15, 0, 36)
+    Subtitle.BackgroundTransparency = 1
+    Subtitle.Text = "Steal An Egg"
+    Subtitle.TextColor3 = Color3.fromRGB(145, 145, 175)
+    Subtitle.TextSize = 9
+    Subtitle.TextXAlignment = Enum.TextXAlignment.Center
+    Subtitle.TextYAlignment = Enum.TextYAlignment.Center
+    Subtitle.Font = Enum.Font.GothamMedium
+    Subtitle.Parent = Container
+
+    local BarBg = Instance.new("Frame")
+    BarBg.Name = "BarBg"
+    BarBg.Size = UDim2.new(0.75, 0, 0, 4)
+    BarBg.Position = UDim2.new(0.125, 0, 0.5, 0)
+    BarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    BarBg.BorderSizePixel = 0
+    BarBg.Parent = Container
+
+    local BarBgCorner = Instance.new("UICorner")
+    BarBgCorner.CornerRadius = UDim.new(1, 0)
+    BarBgCorner.Parent = BarBg
+
+    local Bar = Instance.new("Frame")
+    Bar.Name = "Bar"
+    Bar.Size = UDim2.new(0, 0, 1, 0)
+    Bar.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+    Bar.BorderSizePixel = 0
+    Bar.Parent = BarBg
+
+    local BarCorner = Instance.new("UICorner")
+    BarCorner.CornerRadius = UDim.new(1, 0)
+    BarCorner.Parent = Bar
+
+    local Percent = Instance.new("TextLabel")
+    Percent.Name = "Percent"
+    Percent.Size = UDim2.new(1, -30, 0, 22)
+    Percent.Position = UDim2.new(0, 15, 0.7, 0)
+    Percent.BackgroundTransparency = 1
+    Percent.Text = "0%"
+    Percent.TextColor3 = Color3.fromRGB(105, 90, 190)
+    Percent.TextSize = 18
+    Percent.TextXAlignment = Enum.TextXAlignment.Center
+    Percent.TextYAlignment = Enum.TextYAlignment.Center
+    Percent.Font = Enum.Font.GothamBold
+    Percent.Parent = Container
+
+    local function UpdateProgress(percent)
+        percent = math.clamp(percent, 0, 100)
+        Bar.Size = UDim2.new(percent / 100, 0, 1, 0)
+        Percent.Text = math.floor(percent) .. "%"
+    end
+
+    return {
+        Gui = LoadingGui,
+        Update = UpdateProgress,
+        Destroy = function()
+            LoadingGui:Destroy()
         end
-    end
-    
-    -- Check Backpack
-    local Backpack = LocalPlayer:FindFirstChild("Backpack")
-    if Backpack then
-        for _, child in ipairs(Backpack:GetChildren()) do
-            if child:IsA("Tool") and child:GetAttribute("IsBat") then
-                return child
-            end
-        end
-    end
-    
-    return nil
+    }
 end
 
 -- ==================================================
--- EQUIP BAT
+-- CREATE LOADING SCREEN
 -- ==================================================
-local function EquipBat()
-    local Hum = GetHumanoid()
-    if not Hum then return false end
-    
-    -- Already equipped?
-    local Char = LocalPlayer.Character
-    for _, child in ipairs(Char:GetChildren()) do
-        if child:IsA("Tool") and child:GetAttribute("IsBat") then
-            BatTool = child
-            return true
-        end
-    end
-    
-    -- Find and equip
-    local Tool = FindBatTool()
-    if Tool then
-        Hum:EquipTool(Tool)
-        BatTool = Tool
-        return true
-    end
-    
-    return false
+local Loading = CreateLoadingScreen()
+Loading.Update(5)
+
+-- ==================================================
+-- LOAD CORE FILES
+-- ==================================================
+Loading.Update(10)
+loadstring(GetScript("Config.lua"))()
+
+Loading.Update(15)
+loadstring(GetScript("UI.lua"))()
+
+Loading.Update(20)
+loadstring(GetScript("Components.lua"))()
+
+-- ==================================================
+-- LOAD TABS MANAGER
+-- ==================================================
+Loading.Update(25)
+loadstring(GetScript("Tabs/Init.lua"))()
+
+-- ==================================================
+-- LOAD TABS
+-- ==================================================
+Loading.Update(30)
+loadstring(GetScript("Tabs/Info.lua"))()
+
+Loading.Update(35)
+loadstring(GetScript("Tabs/Farming.lua"))()
+
+Loading.Update(40)
+loadstring(GetScript("Tabs/Combat.lua"))()
+
+Loading.Update(45)
+loadstring(GetScript("Tabs/AutoFarming.lua"))()
+
+Loading.Update(50)
+loadstring(GetScript("Tabs/Event.lua"))()
+
+Loading.Update(55)
+loadstring(GetScript("Tabs/HopServer.lua"))()
+
+Loading.Update(60)
+loadstring(GetScript("Tabs/Setting.lua"))()
+
+-- ==================================================
+-- LOAD FEATURES (លើកលែង Anti Cheat)
+-- ==================================================
+Loading.Update(65)
+loadstring(GetScript("Features/WalkSpeed.lua"))()
+
+Loading.Update(70)
+loadstring(GetScript("Features/AntiTrap.lua"))()
+
+Loading.Update(75)
+loadstring(GetScript("Features/GodMode.lua"))()
+
+Loading.Update(80)
+loadstring(GetScript("Features/TeleportSystem.lua"))()
+
+-- ==================================================
+-- LOAD AUTO ATTACK
+-- ==================================================
+Loading.Update(82)
+loadstring(GetScript("Features/AutoAttack.lua"))()
+
+-- ==================================================
+-- SELECT DEFAULT TAB
+-- ==================================================
+Loading.Update(85)
+if _G.YOKUDO_TabsManager then
+    _G.YOKUDO_TabsManager:SelectTabByName("Info")
 end
 
--- ==================================================
--- FIND CLOSEST TARGET
--- ==================================================
-local function GetClosestTarget()
-    local Hum, Root = GetHumanoid()
-    if not Hum or not Root then return nil end
-    if Hum.Health <= 0 then return nil end
-    
-    local closest = nil
-    local minDist = CONFIG.Range
-    
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character then
-            local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
-            local targetHum = plr.Character:FindFirstChildOfClass("Humanoid")
-            
-            if targetRoot and targetHum and targetHum.Health > 0 then
-                -- Check if target is ragdolled (skip if ragdolled)
-                local isRagdolled = plr.Character:GetAttribute("IsRagdolled") 
-                    or plr:GetAttribute("RagdollEndTime")
-                
-                if not isRagdolled then
-                    local dist = (targetRoot.Position - Root.Position).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        closest = plr
-                    end
-                end
-            end
-        end
-    end
-    
-    return closest, minDist
-end
+Loading.Update(90)
 
 -- ==================================================
--- ATTACK TARGET
+-- LOAD ANTI CHEAT (ក្រោយគេបង្អស់)
 -- ==================================================
-local function AttackTarget(Target)
-    if not Target then return false end
-    
-    local traceId = tostring(LocalPlayer.UserId) .. ":" .. tostring(tick()) .. ":" .. tostring(math.floor(tick() * 1000))
-    
-    local success, err = pcall(function()
-        Remotes.BatSwing.Trigger:FireServer(Target, traceId)
-    end)
-    
-    if success then
-        LastAttack = tick()
-        return true
-    else
-        warn("[YOKUDO] Attack failed: " .. tostring(err))
-        return false
-    end
-end
+Loading.Update(95)
+loadstring(GetScript("Features/BypassAntiCheat.lua"))()
 
--- ==================================================
--- MOVE TO TARGET (using ClickToMoveController)
--- ==================================================
-local function MoveToTarget(Target)
-    if not CONFIG.AutoMove then return end
-    if not Controls then return end
-    if tick() - LastMove < CONFIG.MoveDelay then return end
-    
-    local targetRoot = Target.Character and Target.Character:FindFirstChild("HumanoidRootPart")
-    if not targetRoot then return end
-    
-    LastMove = tick()
-    
-    pcall(function()
-        Controls:MoveTo(targetRoot.Position, false)
-    end)
-end
+Loading.Update(100)
 
--- ==================================================
--- MAIN LOOP
--- ==================================================
-local function StartLoop()
-    if Connection then
-        Connection:Disconnect()
-        Connection = nil
-    end
-    
-    Connection = RunService.Heartbeat:Connect(function()
-        if not Enabled then return end
-        
-        local Hum, Root = GetHumanoid()
-        if not Hum or Hum.Health <= 0 then return end
-        
-        -- Auto Equip
-        if CONFIG.AutoEquip then
-            local equipped = false
-            for _, child in ipairs(LocalPlayer.Character:GetChildren()) do
-                if child:IsA("Tool") and child:GetAttribute("IsBat") then
-                    equipped = true
-                    BatTool = child
-                    break
-                end
-            end
-            
-            if not equipped then
-                EquipBat()
-                return
-            end
-        end
-        
-        -- Check cooldown
-        if tick() - LastAttack < CONFIG.Cooldown then return end
-        
-        -- Find target
-        local target, dist = GetClosestTarget()
-        if target then
-            CurrentTarget = target
-            
-            -- If too far, move closer
-            if dist > CONFIG.MinDistance and CONFIG.AutoMove then
-                MoveToTarget(target)
-            end
-            
-            -- Attack if in range
-            if dist <= CONFIG.Range then
-                AttackTarget(target)
-            end
-        else
-            CurrentTarget = nil
-        end
-    end)
-end
-
--- ==================================================
--- ENABLE / DISABLE
--- ==================================================
-local function Enable()
-    Enabled = true
-    LastAttack = 0
-    LastMove = 0
-    StartLoop()
-    print("[YOKUDO] Auto Attack: ON")
-end
-
-local function Disable()
-    Enabled = false
-    CurrentTarget = nil
-    if Connection then
-        Connection:Disconnect()
-        Connection = nil
-    end
-    if Controls then
-        pcall(function()
-            Controls:MoveTo(LocalPlayer.Character.HumanoidRootPart.Position, false)
-        end)
-    end
-    print("[YOKUDO] Auto Attack: OFF")
-end
-
-local function Toggle()
-    if Enabled then
-        Disable()
-    else
-        Enable()
-    end
-end
-
--- ==================================================
--- AUTO RE-APPLY ON CHARACTER ADDED
--- ==================================================
-LocalPlayer.CharacterAdded:Connect(function()
-    if Enabled then
-        task.wait(1)
-        EquipBat()
-        StartLoop()
-    end
-end)
-
--- ==================================================
--- EXPORT
--- ==================================================
-_G.YOKUDO_AutoAttack = {
-    Toggle = Toggle,
-    Enable = Enable,
-    Disable = Disable,
-    IsEnabled = function() return Enabled end,
-    SetRange = function(v) CONFIG.Range = v end,
-    SetCooldown = function(v) CONFIG.Cooldown = v end,
-    SetAutoMove = function(v) CONFIG.AutoMove = v end,
-    SetAutoEquip = function(v) CONFIG.AutoEquip = v end,
-    GetTarget = function() return CurrentTarget end,
-    GetConfig = function() return CONFIG end,
-}
-
-print("✅ AutoAttack Feature Loaded")
+task.wait(0.3)
+Loading.Destroy()
+print("✅ Loading Screen Closed!")
+print("🚀 YOKUDO HUB | Ready!")
