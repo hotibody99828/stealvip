@@ -1,754 +1,558 @@
 -- ==================================================
--- YOKUDO HUB | FEATURE | Teleport System
--- Egg Collect + Fast Return to Safe
--- Fast Reset + Heartbeat Confirm
+-- YOKUDO HUB | TAB | Auto Farming
 -- ==================================================
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
+local TabsManager = _G.YOKUDO_TabsManager
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
-local Player = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local AutoFarmingTab, AutoFarmingPage = TabsManager:RegisterTab("Auto Farming", 4, "AUTO_FARMING")
 
+-- ==================================================
+-- SETUP ASSETS
+-- ==================================================
+local Assets = ReplicatedStorage:WaitForChild("Data"):WaitForChild("Assets")
+local Configs = Assets:WaitForChild("Configs")
+local EggModels = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Models"):WaitForChild("Eggs")
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
+local MeshIdToCategory = {}
+
+local function BuildMeshIdMap()
+    for _, Config in ipairs(Configs:GetChildren()) do
+        local Success, Module = pcall(function()
+            return require(Config)
+        end)
+        if Success and Module and Module.Egg then
+            local ModelName = Module.Egg.ModelName or Config.Name
+            local EggTemplate = EggModels:FindFirstChild(ModelName)
+            if EggTemplate then
+                for _, descendant in ipairs(EggTemplate:GetDescendants()) do
+                    if descendant:IsA("MeshPart") and descendant.MeshId ~= "" then
+                        MeshIdToCategory[descendant.MeshId] = Config.Name
+                    end
+                    if descendant:IsA("SpecialMesh") and descendant.MeshId ~= "" then
+                        MeshIdToCategory[descendant.MeshId] = Config.Name
+                    end
+                end
+            end
+        end
+    end
+end
+
+BuildMeshIdMap()
+
+local function GetPetData(AssetCategory)
+    local Config = Configs:FindFirstChild(AssetCategory)
+    if not Config then return nil end
+    
+    local Data = {
+        Name = AssetCategory,
+        DisplayName = AssetCategory,
+        EarningRate = 0,
+        Icon = nil
+    }
+    
+    local Success, Module = pcall(function()
+        return require(Config)
+    end)
+    
+    if Success and Module then
+        Data.DisplayName = Module.DisplayName or AssetCategory
+        Data.EarningRate = Module.EarningRate or 0
+        Data.Icon = Module.Icon
+    end
+    
+    return Data
+end
+
+local function FormatMoney(Amount)
+    if type(Amount) ~= "number" then return tostring(Amount) end
+    if Amount >= 1e12 then
+        return string.format("%.2fT", Amount / 1e12)
+    elseif Amount >= 1e9 then
+        return string.format("%.2fB", Amount / 1e9)
+    elseif Amount >= 1e6 then
+        return string.format("%.2fM", Amount / 1e6)
+    elseif Amount >= 1e3 then
+        return string.format("%.2fK", Amount / 1e3)
+    else
+        return tostring(math.floor(Amount))
+    end
+end
+
+local function CalculateRatePerSecond(EarningRate, Scale, Mutations)
+    local PayoutFactor
+    if Scale <= 5 then
+        PayoutFactor = Scale ^ 1.85
+    else
+        PayoutFactor = (Scale / 5) ^ 1.2 * 19.637875755794113
+    end
+    
+    local MutationMultiplier = 1
+    if Mutations and #Mutations > 0 then
+        local Success, MutationsModule = pcall(function()
+            return require(ReplicatedStorage.Shared.Modules.Mutations)
+        end)
+        if Success and MutationsModule then
+            MutationMultiplier = MutationsModule.EarningsFor(Mutations)
+        end
+    end
+    
+    return math.round(EarningRate * PayoutFactor * MutationMultiplier)
+end
+
+local function FindAssetCategory(EggModel)
+    for _, descendant in ipairs(EggModel:GetDescendants()) do
+        if descendant:IsA("MeshPart") and descendant.MeshId ~= "" then
+            local Category = MeshIdToCategory[descendant.MeshId]
+            if Category then return Category end
+        end
+        if descendant:IsA("SpecialMesh") and descendant.MeshId ~= "" then
+            local Category = MeshIdToCategory[descendant.MeshId]
+            if Category then return Category end
+        end
+    end
+    return nil
+end
+
 -- ==================================================
--- PROXIMITY PROMPT
+-- CONTENT
 -- ==================================================
-ProximityPromptService.PromptShown:Connect(function(prompt)
-    prompt.HoldDuration = 0
-    prompt.RequiresLineOfSight = false
-    prompt.MaxActivationDistance = 8
-    prompt.Enabled = true
+CreateSectionTitle(AutoFarmingPage, "Auto Farming", 1)
+
+-- ==================================================
+-- FEATURE 1: Click Get Egg (កាតតូច)
+-- ==================================================
+local GetEggBox = Instance.new("Frame")
+GetEggBox.Size = UDim2.new(1, 0, 0, 60)
+GetEggBox.BackgroundColor3 = Color3.fromRGB(28, 29, 42)
+GetEggBox.BorderSizePixel = 0
+GetEggBox.LayoutOrder = 2
+GetEggBox.Parent = AutoFarmingPage
+
+local GetEggBoxCorner = Instance.new("UICorner")
+GetEggBoxCorner.CornerRadius = UDim.new(0, 8)
+GetEggBoxCorner.Parent = GetEggBox
+
+local GetEggBoxStroke = Instance.new("UIStroke")
+GetEggBoxStroke.Color = Color3.fromRGB(105, 90, 190)
+GetEggBoxStroke.Thickness = 1.5
+GetEggBoxStroke.Transparency = 0.4
+GetEggBoxStroke.Parent = GetEggBox
+
+-- Icon
+local GetEggIcon = Instance.new("ImageLabel")
+GetEggIcon.Size = UDim2.new(0, 40, 0, 40)
+GetEggIcon.Position = UDim2.new(0, 10, 0.5, -20)
+GetEggIcon.BackgroundColor3 = Color3.fromRGB(40, 42, 58)
+GetEggIcon.BorderSizePixel = 0
+GetEggIcon.Image = ""
+GetEggIcon.Parent = GetEggBox
+
+local GetEggIconCorner = Instance.new("UICorner")
+GetEggIconCorner.CornerRadius = UDim.new(0, 6)
+GetEggIconCorner.Parent = GetEggIcon
+
+-- Name
+local GetEggName = Instance.new("TextLabel")
+GetEggName.Size = UDim2.new(1, -140, 0, 16)
+GetEggName.Position = UDim2.new(0, 58, 0, 10)
+GetEggName.BackgroundTransparency = 1
+GetEggName.Text = "No Egg Selected"
+GetEggName.TextColor3 = Color3.fromRGB(255, 255, 255)
+GetEggName.TextSize = 12
+GetEggName.TextXAlignment = Enum.TextXAlignment.Left
+GetEggName.Font = Enum.Font.GothamBold
+GetEggName.Parent = GetEggBox
+
+-- Rate
+local GetEggRate = Instance.new("TextLabel")
+GetEggRate.Size = UDim2.new(1, -140, 0, 16)
+GetEggRate.Position = UDim2.new(0, 58, 0, 30)
+GetEggRate.BackgroundTransparency = 1
+GetEggRate.Text = "$0/s"
+GetEggRate.TextColor3 = Color3.fromRGB(100, 255, 100)
+GetEggRate.TextSize = 11
+GetEggRate.TextXAlignment = Enum.TextXAlignment.Left
+GetEggRate.Font = Enum.Font.Gotham
+GetEggRate.Parent = GetEggBox
+
+-- Checkbox
+local GetEggCheckButton = Instance.new("TextButton")
+GetEggCheckButton.Size = UDim2.new(0, 34, 0, 34)
+GetEggCheckButton.Position = UDim2.new(1, -44, 0.5, -17)
+GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+GetEggCheckButton.BackgroundTransparency = 0.85
+GetEggCheckButton.BorderSizePixel = 0
+GetEggCheckButton.Text = ""
+GetEggCheckButton.AutoButtonColor = false
+GetEggCheckButton.Parent = GetEggBox
+
+local GetEggCheckCorner = Instance.new("UICorner")
+GetEggCheckCorner.CornerRadius = UDim.new(0, 8)
+GetEggCheckCorner.Parent = GetEggCheckButton
+
+local GetEggCheckStroke = Instance.new("UIStroke")
+GetEggCheckStroke.Color = Color3.fromRGB(255, 255, 255)
+GetEggCheckStroke.Thickness = 2
+GetEggCheckStroke.Parent = GetEggCheckButton
+
+local GetEggCheck = Instance.new("TextLabel")
+GetEggCheck.Size = UDim2.new(1, 0, 1, 0)
+GetEggCheck.BackgroundTransparency = 1
+GetEggCheck.Text = "✓"
+GetEggCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+GetEggCheck.TextSize = 20
+GetEggCheck.Font = Enum.Font.GothamBold
+GetEggCheck.Visible = false
+GetEggCheck.Parent = GetEggCheckButton
+
+local SelectedEggId = nil
+local GetEggEnabled = false
+
+-- Update Box (ភ្លាមៗ + Animation)
+local function UpdateGetEggBox(Icon, Name, Rate, EggId)
+    GetEggIcon.Image = Icon or ""
+    GetEggName.Text = Name or "No Egg Selected"
+    GetEggRate.Text = "$" .. FormatMoney(Rate or 0) .. "/s"
+    SelectedEggId = EggId
+    
+    -- Animation ពេល Update
+    GetEggBox.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+    TweenService:Create(GetEggBox, TweenInfo.new(0.3), {
+        BackgroundColor3 = Color3.fromRGB(28, 29, 42)
+    }):Play()
+    
+    GetEggIcon.ImageTransparency = 1
+    GetEggName.TextTransparency = 1
+    GetEggRate.TextTransparency = 1
+    
+    TweenService:Create(GetEggIcon, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
+    TweenService:Create(GetEggName, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+    TweenService:Create(GetEggRate, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+end
+
+local function ToggleGetEgg()
+    GetEggEnabled = not GetEggEnabled
+    GetEggCheck.Visible = GetEggEnabled
+    if GetEggEnabled then
+        GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+        GetEggCheckButton.BackgroundTransparency = 0
+        GetEggCheckStroke.Color = Color3.fromRGB(135, 120, 225)
+        if SelectedEggId and _G.YOKUDO_TeleportSystem then
+            _G.YOKUDO_TeleportSystem.SetTargetId(SelectedEggId)
+            _G.YOKUDO_TeleportSystem.Enable()
+        end
+    else
+        GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        GetEggCheckButton.BackgroundTransparency = 0.85
+        GetEggCheckStroke.Color = Color3.fromRGB(255, 255, 255)
+        if _G.YOKUDO_TeleportSystem then
+            _G.YOKUDO_TeleportSystem.Disable()
+            _G.YOKUDO_TeleportSystem.ResetState()
+        end
+    end
+end
+
+GetEggCheckButton.MouseButton1Click:Connect(function()
+    ToggleGetEgg()
 end)
 
 -- ==================================================
--- SETTINGS
+-- FEATURE 2: Start Check Egg (កាតតូច)
 -- ==================================================
-local SAFE_ZONE = Vector3.new(533, 70, -366)
+local CheckEggHolder = Instance.new("Frame")
+CheckEggHolder.Size = UDim2.new(1, 0, 0, 44)
+CheckEggHolder.BackgroundColor3 = Color3.fromRGB(28, 29, 42)
+CheckEggHolder.BorderSizePixel = 0
+CheckEggHolder.LayoutOrder = 3
+CheckEggHolder.Parent = AutoFarmingPage
 
-local FLY_SPEED = 1100
-local RETURN_SPEED = 900
-local FLY_OFFSET = 30
-local SHOT_DISTANCE = 30
-local ARRIVE_DISTANCE = 2
-local SAFE_LOCK_DISTANCE = 3
+local CheckEggHolderCorner = Instance.new("UICorner")
+CheckEggHolderCorner.CornerRadius = UDim.new(0, 8)
+CheckEggHolderCorner.Parent = CheckEggHolder
 
-local MIN_FLY_DISTANCE = 3
-local Y_CHANGE_THRESHOLD = 1
+local CheckEggHolderStroke = Instance.new("UIStroke")
+CheckEggHolderStroke.Color = Color3.fromRGB(105, 90, 190)
+CheckEggHolderStroke.Thickness = 1.5
+CheckEggHolderStroke.Transparency = 0.4
+CheckEggHolderStroke.Parent = CheckEggHolder
 
--- CAMERA SETTINGS (Top-Down View)
-local CAMERA_HEIGHT = 3
-local CAMERA_DISTANCE = 0
-local CAMERA_ZOOM_STEP = 0.5
-local CAMERA_MIN_HEIGHT = 1
-local LOCK_WAIT = 0.2
+local CheckEggLabel = Instance.new("TextLabel")
+CheckEggLabel.Size = UDim2.new(1, -140, 1, 0)
+CheckEggLabel.Position = UDim2.new(0, 12, 0, 0)
+CheckEggLabel.BackgroundTransparency = 1
+CheckEggLabel.Text = "Start Check Egg"
+CheckEggLabel.TextColor3 = Color3.fromRGB(220, 220, 235)
+CheckEggLabel.TextSize = 13
+CheckEggLabel.TextXAlignment = Enum.TextXAlignment.Left
+CheckEggLabel.TextYAlignment = Enum.TextYAlignment.Center
+CheckEggLabel.Font = Enum.Font.GothamBold
+CheckEggLabel.Parent = CheckEggHolder
 
-local LOOP_INTERVAL = 0.02
-local RETRY_WAIT = 2
-local COLLECT_TARGET = 2
+local CheckEggCount = Instance.new("TextLabel")
+CheckEggCount.Size = UDim2.new(0, 80, 1, 0)
+CheckEggCount.Position = UDim2.new(1, -150, 0, 0)
+CheckEggCount.BackgroundTransparency = 1
+CheckEggCount.Text = "Egg: 0"
+CheckEggCount.TextColor3 = Color3.fromRGB(100, 255, 100)
+CheckEggCount.TextSize = 10
+CheckEggCount.TextXAlignment = Enum.TextXAlignment.Right
+CheckEggCount.TextYAlignment = Enum.TextYAlignment.Center
+CheckEggCount.Font = Enum.Font.Gotham
+CheckEggCount.Parent = CheckEggHolder
 
--- ==================================================
--- STATE
--- ==================================================
-local TARGET_ID = nil
-local CollectCount = 0
+local CheckEggCheckButton = Instance.new("TextButton")
+CheckEggCheckButton.Size = UDim2.new(0, 30, 0, 30)
+CheckEggCheckButton.Position = UDim2.new(1, -40, 0.5, -15)
+CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+CheckEggCheckButton.BackgroundTransparency = 0.85
+CheckEggCheckButton.BorderSizePixel = 0
+CheckEggCheckButton.Text = ""
+CheckEggCheckButton.AutoButtonColor = false
+CheckEggCheckButton.Parent = CheckEggHolder
 
-local Running = false
-local CurrentStep = "idle"
-local TargetEgg = nil
-local TargetPromptPart = nil
-local TargetHover = nil
-local LockStartTime = 0
-local CurrentCameraHeight = CAMERA_HEIGHT
-local SavedYBefore = nil
-local CollectDone = false
-local RetryStartTime = 0
-local WaitingRetry = false
-local GoingToSafe = false
-local OriginalCameraSubject = nil
-local CameraLocked = false
+local CheckEggCorner = Instance.new("UICorner")
+CheckEggCorner.CornerRadius = UDim.new(0, 8)
+CheckEggCorner.Parent = CheckEggCheckButton
 
-local FlyConnection = nil
-local BodyVelocity = nil
-local BodyGyro = nil
-local ActiveHeartbeat = nil
-local MainLoop = nil
-local ConfirmConnection = nil
+local CheckEggStroke = Instance.new("UIStroke")
+CheckEggStroke.Color = Color3.fromRGB(255, 255, 255)
+CheckEggStroke.Thickness = 2
+CheckEggStroke.Parent = CheckEggCheckButton
 
-local SavedWalkSpeed = nil
-local SavedJumpPower = nil
-local SavedJumpHeight = nil
-local SavedUseJumpPower = nil
+local CheckEggCheck = Instance.new("TextLabel")
+CheckEggCheck.Size = UDim2.new(1, 0, 1, 0)
+CheckEggCheck.BackgroundTransparency = 1
+CheckEggCheck.Text = "✓"
+CheckEggCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+CheckEggCheck.TextSize = 20
+CheckEggCheck.Font = Enum.Font.GothamBold
+CheckEggCheck.Visible = false
+CheckEggCheck.Parent = CheckEggCheckButton
 
--- ==================================================
--- GET HUMANOID
--- ==================================================
-local function GetHumanoid()
-    local Char = Player.Character
-    if not Char then return nil, nil end
-    local Hum = Char:FindFirstChildOfClass("Humanoid")
-    local Root = Char:FindFirstChild("HumanoidRootPart")
-    return Hum, Root
-end
+local CheckEggEnabled = false
+local EggScrollFrame = nil
 
--- ==================================================
--- SAVE / RESTORE
--- ==================================================
-local function SaveStats()
-    local Hum = GetHumanoid()
-    if not Hum then return end
-    SavedWalkSpeed = Hum.WalkSpeed
-    SavedJumpPower = Hum.JumpPower
-    SavedJumpHeight = Hum.JumpHeight
-    SavedUseJumpPower = Hum.UseJumpPower
-end
-
-local function RestoreStats()
-    local Hum = GetHumanoid()
-    if not Hum then return end
-    if SavedWalkSpeed ~= nil then pcall(function() Hum.WalkSpeed = SavedWalkSpeed end) end
-    if SavedJumpPower ~= nil then pcall(function() Hum.JumpPower = SavedJumpPower end) end
-    if SavedJumpHeight ~= nil then pcall(function() Hum.JumpHeight = SavedJumpHeight end) end
-    if SavedUseJumpPower ~= nil then pcall(function() Hum.UseJumpPower = SavedUseJumpPower end) end
-end
-
--- ==================================================
--- CLEANUP
--- ==================================================
-local function CleanupMovers()
-    if FlyConnection then
-        FlyConnection:Disconnect()
-        FlyConnection = nil
-    end
-    if BodyVelocity then
-        pcall(function()
-            BodyVelocity.Velocity = Vector3.zero
-            BodyVelocity.MaxForce = Vector3.zero
-        end)
-        BodyVelocity:Destroy()
-        BodyVelocity = nil
-    end
-    if BodyGyro then
-        pcall(function() BodyGyro.MaxTorque = Vector3.zero end)
-        BodyGyro:Destroy()
-        BodyGyro = nil
-    end
-    local Hum, Root = GetHumanoid()
-    if Hum then pcall(function() Hum.PlatformStand = false end) end
-    if Root then
-        pcall(function()
-            Root.AssemblyLinearVelocity = Vector3.zero
-            Root.AssemblyAngularVelocity = Vector3.zero
-        end)
-    end
-end
-
--- ==================================================
--- FIND EGG (Check ទាំង Container និង Workspace)
--- ==================================================
-local function FindEggAnywhere()
-    if not TARGET_ID then return nil end
+local function CreateEggEntry(EggModel)
+    local AssetCategory = FindAssetCategory(EggModel)
+    if not AssetCategory then return nil end
     
-    if Container then
-        local Egg = Container:FindFirstChild(TARGET_ID)
-        if Egg then return Egg end
-    end
+    local Data = GetPetData(AssetCategory)
+    if not Data then return nil end
     
-    local Egg = workspace:FindFirstChild(TARGET_ID)
-    if Egg then return Egg end
+    local Scale = EggModel:GetAttribute("AssetScale") or 1
+    local Mutations = EggModel:GetAttribute("Mutations") or {}
+    local RealRate = CalculateRatePerSecond(Data.EarningRate, Scale, Mutations)
+    local EggId = EggModel.Name
     
-    return nil
-end
-
-local function GetEggPosition(Egg)
-    if not Egg then return nil end
-    if Egg:IsA("Model") then
-        if Egg.PrimaryPart then return Egg.PrimaryPart.Position end
-        local Part = Egg:FindFirstChildWhichIsA("BasePart")
-        if Part then return Part.Position end
-    elseif Egg:IsA("BasePart") then
-        return Egg.Position
-    end
-    return nil
-end
-
-local function GetEggY(Egg)
-    local Pos = GetEggPosition(Egg)
-    if not Pos then return nil end
-    return math.floor(Pos.Y)
-end
-
-local function GetEggDistance(Egg)
-    local Hum, Root = GetHumanoid()
-    if not Root then return 9999 end
-    local EggPos = GetEggPosition(Egg)
-    if not EggPos then return 9999 end
-    return (EggPos - Root.Position).Magnitude
-end
-
--- ==================================================
--- HOVER IN TARGET
--- ==================================================
-local function FindHoverInTarget()
-    if not TARGET_ID then return nil end
+    -- Entry (កាតចុចបានទាំងមូល)
+    local Entry = Instance.new("TextButton")
+    Entry.Size = UDim2.new(1, -8, 0, 44)
+    Entry.BackgroundColor3 = Color3.fromRGB(30, 31, 45)
+    Entry.BorderSizePixel = 0
+    Entry.Text = ""
+    Entry.AutoButtonColor = false
+    Entry.Parent = EggScrollFrame
     
-    if Container then
-        local Slot = Container:FindFirstChild(TARGET_ID)
-        if Slot then
-            local Hover = Slot:FindFirstChild("AreaEggHover")
-            if Hover then return Hover end
-        end
-    end
-
-    local WSEgg = workspace:FindFirstChild(TARGET_ID)
-    if WSEgg then
-        local Hover = WSEgg:FindFirstChild("AreaEggHover")
-        if Hover then return Hover end
-    end
-
-    return nil
-end
-
--- ==================================================
--- SMART PROMPT
--- ==================================================
-local function FindSmartPromptNearTarget(EggPos)
-    if not EggPos then return nil end
-
-    local ClosestPrompt = nil
-    local ClosestDist = 999
-
-    for _, Desc in ipairs(workspace:GetDescendants()) do
-        if Desc.Name == "SmartPromptPart" then
-            local Prompt = Desc:FindFirstChild("CarryAreaEgg")
-            if Prompt and Prompt:IsA("ProximityPrompt") then
-                local Dist = (Desc.Position - EggPos).Magnitude
-                if Dist < ClosestDist then
-                    ClosestDist = Dist
-                    ClosestPrompt = Prompt
-                end
-            end
-        end
-    end
-
-    if ClosestPrompt then
-        ClosestPrompt.Enabled = true
-        ClosestPrompt.HoldDuration = 0
-        ClosestPrompt.RequiresLineOfSight = false
-        ClosestPrompt.MaxActivationDistance = 8
-    end
-
-    return ClosestPrompt
-end
-
--- ==================================================
--- CAMERA FORCE (Top-Down View)
--- ==================================================
-local function ForceCameraToEgg(EggPos, Height)
-    if not Camera then return end
-
-    if OriginalCameraSubject == nil then
-        OriginalCameraSubject = Camera.CameraSubject
-    end
-
-    Camera.CameraType = Enum.CameraType.Scriptable
-    CameraLocked = true
-
-    local H = Height or CAMERA_HEIGHT
-    local CamPos = EggPos + Vector3.new(0, H, 0)
-
-    Camera.CFrame = CFrame.new(CamPos, EggPos)
-    Camera.Focus = CFrame.new(EggPos)
-end
-
-local function ResetCamera()
-    if not Camera then return end
-
-    Camera.CameraType = Enum.CameraType.Custom
-    CameraLocked = false
-
-    local Hum, Root = GetHumanoid()
-    if Hum then
-        Camera.CameraSubject = Hum
-    elseif OriginalCameraSubject then
-        Camera.CameraSubject = OriginalCameraSubject
-    end
-
-    OriginalCameraSubject = nil
-end
-
--- ==================================================
--- FACE EGG
--- ==================================================
-local function FaceEgg(EggPos)
-    local Hum, Root = GetHumanoid()
-    if not Root then return end
-
-    local Direction = (EggPos - Root.Position)
-    local FlatDir = Vector3.new(Direction.X, 0, Direction.Z)
-
-    if FlatDir.Magnitude > 0.1 then
-        Root.CFrame = CFrame.new(Root.Position, Root.Position + FlatDir.Unit)
-    end
-end
-
--- ==================================================
--- PROMPT TARGET
--- ==================================================
-local function PromptTarget()
-    if not TargetPromptPart then return end
-
-    if TargetPromptPart:IsA("ProximityPrompt") then
-        pcall(function()
-            fireproximityprompt(TargetPromptPart)
-        end)
-    end
-end
-
--- ==================================================
--- FLY TP
--- ==================================================
-local function FlyTP(Destination, Speed, UseShotTP, Callback)
-    CleanupMovers()
-
-    local Hum, Root = GetHumanoid()
-    if not Hum or not Root then return end
-    if Hum.Health <= 0 then return end
-
-    local FlyPos = Vector3.new(Destination.X, Destination.Y + FLY_OFFSET, Destination.Z)
-    local LockCFrame = CFrame.new(Destination)
-
-    Hum.PlatformStand = true
-    Hum.WalkSpeed = 0
-    Hum.JumpPower = 0
-
-    BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.Name = "YokudoBV"
-    BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    BodyVelocity.P = 1250
-    BodyVelocity.Velocity = Vector3.zero
-    BodyVelocity.Parent = Root
-
-    BodyGyro = Instance.new("BodyGyro")
-    BodyGyro.Name = "YokudoBG"
-    BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    BodyGyro.P = 3000
-    BodyGyro.D = 500
-    BodyGyro.CFrame = Root.CFrame
-    BodyGyro.Parent = Root
-
-    local StartTime = tick()
-    local ShotDone = false
-
-    FlyConnection = RunService.Heartbeat:Connect(function()
-        if not Running then
-            CleanupMovers()
-            return
-        end
-
-        local Hum2, Root2 = GetHumanoid()
-        if not Hum2 or not Root2 then
-            CleanupMovers()
-            return
-        end
-        if Hum2.Health <= 0 then return end
-
-        if not BodyVelocity or not BodyGyro then
-            CleanupMovers()
-            return
-        end
-
-        local CurrentPos = Root2.Position
-        local Direction = (FlyPos - CurrentPos)
-        local HorizDist = Vector3.new(Direction.X, 0, Direction.Z).Magnitude
-        local VertDist = math.abs(Direction.Y)
-        local TotalDist = Direction.Magnitude
-
-        -- SAFE ZONE
-        if Speed == RETURN_SPEED then
-            if HorizDist <= SAFE_LOCK_DISTANCE then
-                CleanupMovers()
-
-                Hum2.PlatformStand = false
-                Root2.CFrame = CFrame.new(SAFE_ZONE)
-                Root2.AssemblyLinearVelocity = Vector3.zero
-                Root2.AssemblyAngularVelocity = Vector3.zero
-
-                if Callback then Callback() end
-                return
-            end
-        end
-
-        if UseShotTP and HorizDist <= SHOT_DISTANCE and not ShotDone then
-            ShotDone = true
-            CleanupMovers()
-
-            Hum2.PlatformStand = false
-            Root2.CFrame = LockCFrame
-            Root2.AssemblyLinearVelocity = Vector3.zero
-            Root2.AssemblyAngularVelocity = Vector3.zero
-
-            if Callback then Callback() end
-            return
-        end
-
-        if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
-            CleanupMovers()
-
-            Hum2.PlatformStand = false
-            Root2.CFrame = LockCFrame
-            Root2.AssemblyLinearVelocity = Vector3.zero
-            Root2.AssemblyAngularVelocity = Vector3.zero
-
-            if Callback then Callback() end
-            return
-        end
-
-        if tick() - StartTime > 15 then
-            CleanupMovers()
-            Hum2.PlatformStand = false
-            if Callback then Callback() end
-            return
-        end
-
-        if TotalDist > 1 then
-            BodyVelocity.Velocity = Direction.Unit * Speed
-        else
-            BodyVelocity.Velocity = Vector3.zero
-        end
-
-        BodyGyro.CFrame = CFrame.new(CurrentPos, CurrentPos + Vector3.new(Direction.X, 0, Direction.Z))
-    end)
-end
-
--- ==================================================
--- FLY TO SAFE ZONE (Reset Camera + Fast Reset)
--- ==================================================
-local function FlyToSafeZone()
-    GoingToSafe = true
-    CurrentStep = "to_safe"
-
-    -- Reset Camera មុនពេល Fly
-    ResetCamera()
-
-    FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
-        -- ដល់ Safe Zone → Reset ភ្លាមៗ
-        CurrentStep = "stop"
+    local EntryCorner = Instance.new("UICorner")
+    EntryCorner.CornerRadius = UDim.new(0, 6)
+    EntryCorner.Parent = Entry
+    
+    local EntryStroke = Instance.new("UIStroke")
+    EntryStroke.Color = Color3.fromRGB(105, 90, 190)
+    EntryStroke.Thickness = 1
+    EntryStroke.Transparency = 0.7
+    EntryStroke.Parent = Entry
+    
+    -- Icon
+    local IconFrame = Instance.new("Frame")
+    IconFrame.Size = UDim2.new(0, 34, 0, 34)
+    IconFrame.Position = UDim2.new(0, 5, 0.5, -17)
+    IconFrame.BackgroundColor3 = Color3.fromRGB(40, 42, 58)
+    IconFrame.BorderSizePixel = 0
+    IconFrame.Parent = Entry
+    
+    local IconCorner = Instance.new("UICorner")
+    IconCorner.CornerRadius = UDim.new(0, 6)
+    IconCorner.Parent = IconFrame
+    
+    local IconImage = Instance.new("ImageLabel")
+    IconImage.Size = UDim2.new(1, -4, 1, -4)
+    IconImage.Position = UDim2.new(0, 2, 0, 2)
+    IconImage.BackgroundTransparency = 1
+    IconImage.Image = Data.Icon or ""
+    IconImage.Parent = IconFrame
+    
+    local ImageCorner = Instance.new("UICorner")
+    ImageCorner.CornerRadius = UDim.new(0, 6)
+    ImageCorner.Parent = IconImage
+    
+    -- Name
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Size = UDim2.new(1, -50, 0, 16)
+    NameLabel.Position = UDim2.new(0, 48, 0, 6)
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Text = Data.DisplayName
+    NameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NameLabel.TextSize = 11
+    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    NameLabel.Font = Enum.Font.GothamBold
+    NameLabel.Parent = Entry
+    
+    -- Rate
+    local RateLabel = Instance.new("TextLabel")
+    RateLabel.Size = UDim2.new(1, -50, 0, 14)
+    RateLabel.Position = UDim2.new(0, 48, 0, 24)
+    RateLabel.BackgroundTransparency = 1
+    RateLabel.Text = "$" .. FormatMoney(RealRate) .. "/s"
+    RateLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    RateLabel.TextSize = 10
+    RateLabel.TextXAlignment = Enum.TextXAlignment.Left
+    RateLabel.Font = Enum.Font.Gotham
+    RateLabel.Parent = Entry
+    
+    -- Click Card → Load ភ្លាមៗទៅ Feature 1
+    Entry.MouseButton1Click:Connect(function()
+        -- Animation ពេល Click
+        TweenService:Create(Entry, TweenInfo.new(0.1), {
+            BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+        }):Play()
         
-        -- Reset State ភ្លាមៗ
-        FullReset()
+        task.wait(0.1)
+        
+        TweenService:Create(Entry, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(30, 31, 45)
+        }):Play()
+        
+        -- Load ទៅ Feature 1 ភ្លាម
+        UpdateGetEggBox(Data.Icon, Data.DisplayName, RealRate, EggId)
     end)
-end
-
--- ==================================================
--- RESET STATE RETRY (Round #1 → Round #2)
--- មិន Reset Camera ទេ - រក្សា Camera Lock ជាប់
--- ==================================================
-local function ResetStateRetry()
-    TargetEgg = nil
-    TargetPromptPart = nil
-    TargetHover = nil
-    LockStartTime = 0
-    SavedYBefore = nil
-    CollectDone = false
-    WaitingRetry = false
-    RetryStartTime = 0
-    GoingToSafe = false
-
-    CleanupMovers()
-
-    CurrentStep = "idle"
-    print("[YOKUDO] State Reset - Retry #" .. (CollectCount + 1))
-end
-
--- ==================================================
--- FULL RESET (Fast)
--- ==================================================
-local function FullReset()
-    Running = false
-    CurrentStep = "idle"
-
-    TargetEgg = nil
-    TargetPromptPart = nil
-    TargetHover = nil
-    LockStartTime = 0
-    CurrentCameraHeight = CAMERA_HEIGHT
-    SavedYBefore = nil
-    CollectDone = false
-    WaitingRetry = false
-    RetryStartTime = 0
-    GoingToSafe = false
-    CollectCount = 0
-
-    CleanupMovers()
-    if ActiveHeartbeat then
-        ActiveHeartbeat:Disconnect()
-        ActiveHeartbeat = nil
-    end
-    if MainLoop then
-        MainLoop:Disconnect()
-        MainLoop = nil
-    end
-    if ConfirmConnection then
-        ConfirmConnection:Disconnect()
-        ConfirmConnection = nil
-    end
-    ResetCamera()
-    RestoreStats()
-
-    print("[YOKUDO] Full Reset")
-end
-
--- ==================================================
--- FAST CONFIRM (Heartbeat Y Check)
--- ==================================================
-local function StartFastConfirm()
-    if ConfirmConnection then
-        ConfirmConnection:Disconnect()
-        ConfirmConnection = nil
-    end
-
-    ConfirmConnection = RunService.Heartbeat:Connect(function()
-        if not Running then
-            if ConfirmConnection then
-                ConfirmConnection:Disconnect()
-                ConfirmConnection = nil
-            end
-            return
-        end
-
-        -- Check Y ភ្លាមៗ
-        local CurrentEgg = FindEggAnywhere()
-        local CurrentY = nil
-
-        if CurrentEgg then
-            CurrentY = GetEggY(CurrentEgg)
-        end
-
-        -- Confirm ពេល Y ដូរ
-        if SavedYBefore and CurrentY and not CollectDone then
-            if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
-                CollectDone = true
-                CollectCount = CollectCount + 1
-
-                -- បញ្ឈប់ Confirm
-                if ConfirmConnection then
-                    ConfirmConnection:Disconnect()
-                    ConfirmConnection = nil
-                end
-
-                if CollectCount >= COLLECT_TARGET then
-                    -- Done all → Fly Safe ភ្លាម
-                    FlyToSafeZone()
-                else
-                    -- Retry (Round #2)
-                    WaitingRetry = true
-                    RetryStartTime = tick()
-                end
-            end
-        end
-    end)
-end
-
--- ==================================================
--- HEARTBEAT (Active)
--- ==================================================
-local function StartActiveHeartbeat()
-    if ActiveHeartbeat then
-        ActiveHeartbeat:Disconnect()
-        ActiveHeartbeat = nil
-    end
-
-    ActiveHeartbeat = RunService.Heartbeat:Connect(function()
-        if not Running then return end
-
-        local Hum, Root = GetHumanoid()
-        if not Hum or not Root then return end
-        if Hum.Health <= 0 then return end
-
-        -- WAIT RETRY (2s before retry)
-        if WaitingRetry then
-            local Elapsed = tick() - RetryStartTime
-
-            if Elapsed >= RETRY_WAIT then
-                if CollectCount >= COLLECT_TARGET then
-                    WaitingRetry = false
-                    FlyToSafeZone()
-                else
-                    ResetStateRetry()
-                end
-            end
-            return
-        end
-
-        -- LOCK + FACE + CAMERA + HOVER + PROMPT
-        if CurrentStep == "lock_egg" then
-            if not TargetEgg then
-                CurrentStep = "idle"
-                return
-            end
-
-            local EggPos = GetEggPosition(TargetEgg)
-            if not EggPos then
-                CurrentStep = "idle"
-                TargetEgg = nil
-                return
-            end
-
-            Root.CFrame = CFrame.new(EggPos)
-            Root.AssemblyLinearVelocity = Vector3.zero
-            Root.AssemblyAngularVelocity = Vector3.zero
-
-            FaceEgg(EggPos)
-            ForceCameraToEgg(EggPos, CurrentCameraHeight)
-
-            local Elapsed = tick() - LockStartTime
-
-            if Elapsed >= LOCK_WAIT then
-                local Y = GetEggY(TargetEgg)
-                if Y and not SavedYBefore then
-                    SavedYBefore = Y
-                    -- ចាប់ផ្តើម Confirm ភ្លាម
-                    StartFastConfirm()
-                end
-
-                local Hover2 = FindHoverInTarget()
-
-                if Hover2 then
-                    TargetHover = Hover2
-
-                    if not TargetPromptPart then
-                        TargetPromptPart = FindSmartPromptNearTarget(EggPos)
-                    end
-
-                    if TargetPromptPart then
-                        PromptTarget()
-                    end
-                else
-                    CurrentCameraHeight = CurrentCameraHeight + CAMERA_ZOOM_STEP
-                    if CurrentCameraHeight > CAMERA_HEIGHT * 3 then
-                        CurrentCameraHeight = CAMERA_HEIGHT * 3
-                    end
-                end
-            end
-
-        elseif CurrentStep == "to_safe" then
-            -- Handled by FlyToSafeZone
-
-        elseif CurrentStep == "stop" then
-            FullReset()
-        end
-    end)
-end
-
--- ==================================================
--- MAIN LOOP (Check Egg → Fly TP)
--- ==================================================
-local function StartMainLoop()
-    if MainLoop then
-        MainLoop:Disconnect()
-        MainLoop = nil
-    end
-
-    MainLoop = RunService.Heartbeat:Connect(function()
-        if not Running then return end
-
-        local Hum, Root = GetHumanoid()
-        if not Hum or not Root then return end
-        if Hum.Health <= 0 then return end
-
-        if WaitingRetry then return end
-        if GoingToSafe then return end
-
-        local CachedEgg = FindEggAnywhere()
-
-        if CurrentStep == "idle" and CachedEgg then
-            local EggPos = GetEggPosition(CachedEgg)
-            if EggPos then
-                local Dist = GetEggDistance(CachedEgg)
-                if Dist > MIN_FLY_DISTANCE then
-                    TargetEgg = CachedEgg
-                    TargetPromptPart = nil
-                    SavedYBefore = nil
-
-                    CurrentStep = "to_egg"
-
-                    FlyTP(EggPos, FLY_SPEED, true, function()
-                        LockStartTime = tick()
-                        CurrentStep = "lock_egg"
-                    end)
-                end
-            end
-        end
-    end)
-end
-
--- ==================================================
--- ENABLE / DISABLE
--- ==================================================
-local function Enable()
-    if Running then return end
     
-    FullReset()
+    -- Hover Animation
+    Entry.MouseEnter:Connect(function()
+        TweenService:Create(EntryStroke, TweenInfo.new(0.15), {
+            Transparency = 0.2,
+            Color = Color3.fromRGB(135, 120, 225)
+        }):Play()
+    end)
     
-    Running = true
-    CurrentStep = "idle"
-    CollectDone = false
-    SavedYBefore = nil
-    TargetPromptPart = nil
-    WaitingRetry = false
-    GoingToSafe = false
-    CollectCount = 0
-    SaveStats()
-
-    StartActiveHeartbeat()
-    StartMainLoop()
-
-    print("[YOKUDO] Teleport System: ON")
+    Entry.MouseLeave:Connect(function()
+        TweenService:Create(EntryStroke, TweenInfo.new(0.15), {
+            Transparency = 0.7,
+            Color = Color3.fromRGB(105, 90, 190)
+        }):Play()
+    end)
+    
+    return Entry
 end
 
-local function Disable()
-    -- Reset ភ្លាមៗ
-    FullReset()
-    print("[YOKUDO] Teleport System: OFF (Fast Reset)")
+local function RefreshEggList()
+    if not CheckEggEnabled then return end
+    
+    for _, child in ipairs(EggScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local EggDataList = {}
+    
+    for _, child in ipairs(Container:GetChildren()) do
+        if child:IsA("Model") then
+            local AssetCategory = FindAssetCategory(child)
+            if AssetCategory then
+                local Data = GetPetData(AssetCategory)
+                if Data then
+                    local Scale = child:GetAttribute("AssetScale") or 1
+                    local Mutations = child:GetAttribute("Mutations") or {}
+                    local RealRate = CalculateRatePerSecond(Data.EarningRate, Scale, Mutations)
+                    table.insert(EggDataList, {
+                        Model = child,
+                        Data = Data,
+                        Rate = RealRate
+                    })
+                end
+            end
+        end
+    end
+    
+    table.sort(EggDataList, function(a, b)
+        return a.Rate > b.Rate
+    end)
+    
+    for _, EggData in ipairs(EggDataList) do
+        CreateEggEntry(EggData.Model)
+    end
+    
+    EggScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #EggDataList * 48)
+    CheckEggCount.Text = "Egg: " .. #EggDataList
 end
 
-local function SetTargetId(Id)
-    TARGET_ID = Id
-    print("[YOKUDO] Teleport System Target ID: " .. tostring(Id))
+local function ToggleCheckEgg()
+    CheckEggEnabled = not CheckEggEnabled
+    CheckEggCheck.Visible = CheckEggEnabled
+    if CheckEggEnabled then
+        CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+        CheckEggCheckButton.BackgroundTransparency = 0
+        CheckEggStroke.Color = Color3.fromRGB(135, 120, 225)
+        RefreshEggList()
+    else
+        CheckEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        CheckEggCheckButton.BackgroundTransparency = 0.85
+        CheckEggStroke.Color = Color3.fromRGB(255, 255, 255)
+        for _, child in ipairs(EggScrollFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+        CheckEggCount.Text = "Egg: 0"
+    end
 end
 
-local function ResetState()
-    FullReset()
-    print("[YOKUDO] Teleport System: State Reset")
-end
-
-local function GetState()
-    return {
-        Running = Running,
-        CurrentStep = CurrentStep,
-        CollectCount = CollectCount,
-        TargetId = TARGET_ID,
-        Hover = TargetHover ~= nil,
-        Prompt = TargetPromptPart ~= nil,
-        CameraLocked = CameraLocked,
-        CameraHeight = CurrentCameraHeight
-    }
-end
+CheckEggCheckButton.MouseButton1Click:Connect(function()
+    ToggleCheckEgg()
+end)
 
 -- ==================================================
--- EXPORT
+-- EGG LIST
 -- ==================================================
-_G.YOKUDO_TeleportSystem = {
-    Enable = Enable,
-    Disable = Disable,
-    SetTargetId = SetTargetId,
-    ResetState = ResetState,
-    GetState = GetState,
-    IsEnabled = function() return Running end,
-    GetTargetId = function() return TARGET_ID end
-}
+EggScrollFrame = Instance.new("ScrollingFrame")
+EggScrollFrame.Size = UDim2.new(1, 0, 0, 200)
+EggScrollFrame.BackgroundTransparency = 1
+EggScrollFrame.BorderSizePixel = 0
+EggScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+EggScrollFrame.ScrollBarThickness = 4
+EggScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(200, 200, 220)
+EggScrollFrame.LayoutOrder = 4
+EggScrollFrame.Parent = AutoFarmingPage
 
-print("✅ TeleportSystem Feature Loaded (Fast Reset + Heartbeat Confirm)")
+local EggListLayout = Instance.new("UIListLayout")
+EggListLayout.Padding = UDim.new(0, 4)
+EggListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+EggListLayout.Parent = EggScrollFrame
+
+Container.ChildAdded:Connect(function()
+    task.wait(0.2)
+    if CheckEggEnabled then
+        RefreshEggList()
+    end
+end)
+
+Container.ChildRemoved:Connect(function()
+    task.wait(0.2)
+    if CheckEggEnabled then
+        RefreshEggList()
+    end
+end)
+
+task.spawn(function()
+    while task.wait(1) do
+        if CheckEggEnabled then
+            RefreshEggList()
+        end
+    end
+end)
+
+print("✅ Auto Farming Tab Loaded")
