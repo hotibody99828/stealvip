@@ -164,40 +164,72 @@ loadstring(GetScript("Config.lua"))()
 Loading.Update(15)
 loadstring(GetScript("UI.lua"))()
 
-Loading.Update(25)
+Loading.Update(20)
 loadstring(GetScript("Components.lua"))()
 
+-- ==================================================
+-- LOAD TABS MANAGER
+-- ==================================================
+Loading.Update(25)
+loadstring(GetScript("Tabs/Init.lua"))()
+
+-- ==================================================
+-- LOAD TABS
+-- ==================================================
+Loading.Update(30)
+loadstring(GetScript("Tabs/Info.lua"))()
+
 Loading.Update(35)
-loadstring(GetScript("Tabs.lua"))()
+loadstring(GetScript("Tabs/Farming.lua"))()
+
+Loading.Update(40)
+loadstring(GetScript("Tabs/Combat.lua"))()
+
+Loading.Update(45)
+loadstring(GetScript("Tabs/AutoFarming.lua"))()
+
+Loading.Update(50)
+loadstring(GetScript("Tabs/Event.lua"))()
+
+Loading.Update(55)
+loadstring(GetScript("Tabs/HopServer.lua"))()
+
+Loading.Update(60)
+loadstring(GetScript("Tabs/Setting.lua"))()
 
 -- ==================================================
 -- LOAD FEATURES
 -- ==================================================
-Loading.Update(45)
+Loading.Update(65)
 loadstring(GetScript("Features/WalkSpeed.lua"))()
 
-Loading.Update(55)
+Loading.Update(70)
 loadstring(GetScript("Features/BypassAntiCheat.lua"))()
 
-Loading.Update(65)
+Loading.Update(75)
 loadstring(GetScript("Features/AntiTrap.lua"))()
 
-Loading.Update(75)
+Loading.Update(80)
 loadstring(GetScript("Features/GodMode.lua"))()
 
 Loading.Update(85)
-loadstring(GetScript("Features/AutoFarm.lua"))()
-
-Loading.Update(90)
 loadstring(GetScript("Features/TeleportSystem.lua"))()
 
 -- ==================================================
 -- AUTO ENABLE BYPASS ANTI CHEAT
 -- ==================================================
-Loading.Update(95)
+Loading.Update(90)
 if _G.YOKUDO_Bypass then
     _G.YOKUDO_Bypass.Enable()
     print("[YOKUDO] Bypass Anti Cheat: AUTO ENABLED")
+end
+
+-- ==================================================
+-- SELECT DEFAULT TAB
+-- ==================================================
+Loading.Update(95)
+if _G.YOKUDO_TabsManager then
+    _G.YOKUDO_TabsManager:SelectTabByName("Info")
 end
 
 Loading.Update(100)
