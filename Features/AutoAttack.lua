@@ -1,6 +1,6 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Auto Attack
--- Auto Equip Bat + Auto Hit Player (Remote)
+-- Auto Equip Bat + Auto Fire Remote
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -28,8 +28,8 @@ end
 -- ==================================================
 -- SETTINGS
 -- ==================================================
-local HIT_RANGE = 50
-local SWING_INTERVAL = 0.5
+local HIT_RANGE = 100 -- ដូរពី 50 ទៅ 100
+local FIRE_INTERVAL = 0.5
 
 -- ==================================================
 -- STATE
@@ -39,7 +39,7 @@ local AutoHitEnabled = false
 local EquipConnection = nil
 local HitConnection = nil
 local CurrentBat = nil
-local LastSwing = 0
+local LastFire = 0
 local TraceSequence = 0
 
 -- ==================================================
@@ -147,7 +147,7 @@ local function ToggleAutoEquip()
 end
 
 -- ==================================================
--- FEATURE 2: AUTO HIT PLAYER (Remote)
+-- FEATURE 2: AUTO FIRE REMOTE (Range 100)
 -- ==================================================
 local function FindClosestPlayer()
     local Hum, Root = GetHumanoid()
@@ -176,39 +176,19 @@ local function FindClosestPlayer()
     return Closest
 end
 
-local function HitPlayer()
+local function FireRemote()
     local Target = FindClosestPlayer()
+    if not Target then return end
     
-    -- Face Target
-    local Hum, Root = GetHumanoid()
-    if Root and Target and Target.Character then
-        local TargetRoot = Target.Character:FindFirstChild("HumanoidRootPart")
-        if TargetRoot then
-            local Direction = (TargetRoot.Position - Root.Position)
-            local FlatDir = Vector3.new(Direction.X, 0, Direction.Z)
-            if FlatDir.Magnitude > 0.1 then
-                Root.CFrame = CFrame.new(Root.Position, Root.Position + FlatDir.Unit)
-            end
-        end
-    end
-    
-    -- ប្រើ Remote ពិត
     local Remote = GetBatSwingRemote()
-    if Remote then
-        TraceSequence = TraceSequence + 1
-        local TraceId = tostring(Player.UserId) .. ":" .. tostring(TraceSequence) .. ":" .. tostring(math.floor(workspace:GetServerTimeNow() * 1000))
-        
-        pcall(function()
-            Remote:FireServer(Target, TraceId)
-        end)
-    else
-        -- Fallback
-        if CurrentBat then
-            pcall(function()
-                CurrentBat:Activate()
-            end)
-        end
-    end
+    if not Remote then return end
+    
+    TraceSequence = TraceSequence + 1
+    local TraceId = tostring(Player.UserId) .. ":" .. tostring(TraceSequence) .. ":" .. tostring(math.floor(workspace:GetServerTimeNow() * 1000))
+    
+    pcall(function()
+        Remote:FireServer(Target, TraceId)
+    end)
 end
 
 local function EnableAutoHit()
@@ -224,13 +204,13 @@ local function EnableAutoHit()
         if not AutoHitEnabled then return end
         
         local now = tick()
-        if now - LastSwing < SWING_INTERVAL then return end
-        LastSwing = now
+        if now - LastFire < FIRE_INTERVAL then return end
+        LastFire = now
         
-        HitPlayer()
+        FireRemote()
     end)
     
-    print("[YOKUDO] Auto Hit Player (Remote): ON")
+    print("[YOKUDO] Auto Fire Remote (Range 100): ON")
 end
 
 local function DisableAutoHit()
@@ -242,7 +222,7 @@ local function DisableAutoHit()
         HitConnection = nil
     end
     
-    print("[YOKUDO] Auto Hit Player: OFF")
+    print("[YOKUDO] Auto Fire Remote: OFF")
 end
 
 local function ToggleAutoHit()
@@ -267,18 +247,22 @@ end)
 -- EXPORT
 -- ==================================================
 _G.YOKUDO_AutoAttack = {
+    -- Auto Equip
     ToggleAutoEquip = ToggleAutoEquip,
     EnableAutoEquip = EnableAutoEquip,
     DisableAutoEquip = DisableAutoEquip,
     IsAutoEquipEnabled = function() return AutoEquipEnabled end,
     
+    -- Auto Fire
     ToggleAutoHit = ToggleAutoHit,
     EnableAutoHit = EnableAutoHit,
     DisableAutoHit = DisableAutoHit,
     IsAutoHitEnabled = function() return AutoHitEnabled end,
     
+    -- Utils
     FindBatTool = FindBatTool,
-    GetBatSwingRemote = GetBatSwingRemote
+    GetBatSwingRemote = GetBatSwingRemote,
+    FindClosestPlayer = FindClosestPlayer
 }
 
-print("✅ AutoAttack Feature Loaded (Remote)")
+print("✅ AutoAttack Feature Loaded (Fire Remote Range 100)")
