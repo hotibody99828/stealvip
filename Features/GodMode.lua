@@ -1,9 +1,9 @@
 -- ==================================================
--- YOKUDO HUB | FEATURE | God Mode + Bypass Anti Cheat
+-- YOKUDO HUB | FEATURE | God Mode
+-- Humanoid Replace + Anti Death
 -- ==================================================
 
 local Players = game:GetService("Players")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local RunService = game:GetService("RunService")
 
 local Player = Players.LocalPlayer
@@ -13,11 +13,12 @@ local Player = Players.LocalPlayer
 -- ==================================================
 local GodModeEnabled = false
 local GodModeConnection = nil
+local GodMode = true
 
 -- ==================================================
--- BYPASS ANTI CHEAT (HUMANOID REPLACE)
+-- RUN HUMANOID REPLACE + ANTI DEATH
 -- ==================================================
-local function RunBypassAntiCheat()
+local function RunGodMode()
     local Character = Player.Character
     if not Character then return end
 
@@ -30,13 +31,6 @@ local function RunBypassAntiCheat()
     print("========================================")
     print("[YOKUDO] START HUMANOID REPLACE")
     print("========================================")
-
-    local GodMode = true
-
-    -- INSTANT PROXIMITY PROMPTS
-    ProximityPromptService.PromptShown:Connect(function(prompt)
-        prompt.HoldDuration = 0
-    end)
 
     -- SAVE JUMP PROPERTIES
     local SavedJumpProperties = {}
@@ -220,20 +214,6 @@ local function RunBypassAntiCheat()
     BlockDeathState()
     BindAntiDeath(NewHumanoid)
 
-    task.spawn(function()
-        while GodModeEnabled do
-            task.wait(0.1)
-            if GodMode and NewHumanoid and NewHumanoid.Parent then
-                pcall(function()
-                    if NewHumanoid.Health < NewHumanoid.MaxHealth then
-                        NewHumanoid.Health = NewHumanoid.MaxHealth
-                    end
-                    NewHumanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-                end)
-            end
-        end
-    end)
-
     -- CONTROL MODULE
     local function RefreshControls()
         local PlayerScripts = Player:FindFirstChild("PlayerScripts")
@@ -320,15 +300,7 @@ local function RunBypassAntiCheat()
         end)
     end
 
-    print("========================================")
-    print("[YOKUDO] HUMANOID REPLACE + ANTI DEATH COMPLETE")
-    print("========================================")
-end
-
--- ==================================================
--- GOD MODE LOOP
--- ==================================================
-local function StartGodModeLoop()
+    -- START GOD MODE LOOP
     if GodModeConnection then
         GodModeConnection:Disconnect()
         GodModeConnection = nil
@@ -337,13 +309,16 @@ local function StartGodModeLoop()
     GodModeConnection = RunService.Heartbeat:Connect(function()
         if not GodModeEnabled then return end
 
-        local Character = Player.Character
-        if not Character then return end
+        local Char = Player.Character
+        if not Char then return end
 
-        local Hum = Character:FindFirstChildOfClass("Humanoid")
+        local Hum = Char:FindFirstChildOfClass("Humanoid")
         if not Hum then return end
 
         pcall(function()
+            if Hum.Health < Hum.MaxHealth then
+                Hum.Health = Hum.MaxHealth
+            end
             Hum.MaxHealth = math.huge
             Hum.Health = math.huge
             Hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
@@ -351,13 +326,10 @@ local function StartGodModeLoop()
             Hum.RequiresNeck = false
         end)
     end)
-end
 
-local function StopGodModeLoop()
-    if GodModeConnection then
-        GodModeConnection:Disconnect()
-        GodModeConnection = nil
-    end
+    print("========================================")
+    print("[YOKUDO] HUMANOID REPLACE + ANTI DEATH COMPLETE")
+    print("========================================")
 end
 
 -- ==================================================
@@ -365,15 +337,17 @@ end
 -- ==================================================
 local function EnableGodMode()
     GodModeEnabled = true
-    RunBypassAntiCheat()
-    StartGodModeLoop()
-    print("[YOKUDO] God Mode + Bypass Anti Cheat: ON")
+    task.spawn(RunGodMode)
+    print("[YOKUDO] God Mode: ON")
 end
 
 local function DisableGodMode()
     GodModeEnabled = false
-    StopGodModeLoop()
-    print("[YOKUDO] God Mode + Bypass Anti Cheat: OFF")
+    if GodModeConnection then
+        GodModeConnection:Disconnect()
+        GodModeConnection = nil
+    end
+    print("[YOKUDO] God Mode: OFF")
 end
 
 local function ToggleGodMode()
