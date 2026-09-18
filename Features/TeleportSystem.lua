@@ -1,7 +1,6 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
--- Egg Collect + Fast Return to Safe
--- Mobile + Workspace Fix
+-- Egg Collect: Round 1 & 2 Same Flow
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -28,8 +27,8 @@ end)
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1000
-local RETURN_SPEED = 800
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -39,13 +38,13 @@ local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 1
 
 local CAMERA_DISTANCE = 1.5
-local CAMERA_ZOOM_STEP = 0.3
-local CAMERA_MIN_DISTANCE = 1.0
-local LOCK_WAIT = 0.3  -- បង្កើនពី 0.2 ទៅ 0.3 សម្រាប់ Mobile
+local CAMERA_ZOOM_STEP = 0.1
+local CAMERA_MIN_DISTANCE = 0.5
+local LOCK_WAIT = 0.2
+local HOVER_CHECK_INTERVAL = 0.05
 
 local LOOP_INTERVAL = 0.02
-local RETRY_WAIT = 2
-local COLLECT_TARGET = 2
+local MAX_COLLECT = 2
 
 -- ==================================================
 -- STATE
@@ -62,10 +61,9 @@ local LockStartTime = 0
 local CurrentZoom = CAMERA_DISTANCE
 local SavedYBefore = nil
 local CollectDone = false
-local RetryStartTime = 0
-local WaitingRetry = false
-local GoingToSafe = false
 local OriginalCameraSubject = nil
+local LastHoverCheck = 0
+local HoverFound = false
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -142,22 +140,20 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG (Check ទាំង Container និង Workspace)
+-- FIND EGG
 -- ==================================================
+local function FindEggInContainer()
+    if not TARGET_ID or not Container then return nil end
+    return Container:FindFirstChild(TARGET_ID)
+end
+
+local function FindEggInWorkspace()
+    if not TARGET_ID then return nil end
+    return workspace:FindFirstChild(TARGET_ID)
+end
+
 local function FindEggAnywhere()
-    if not TARGET_ID then return nil, nil end
-    
-    -- Check Container មុន
-    if Container then
-        local Egg = Container:FindFirstChild(TARGET_ID)
-        if Egg then return Egg, "container" end
-    end
-    
-    -- Check Workspace
-    local Egg = workspace:FindFirstChild(TARGET_ID)
-    if Egg then return Egg, "workspace" end
-    
-    return nil, nil
+    return FindEggInContainer() or FindEggInWorkspace()
 end
 
 local function GetEggPosition(Egg)
@@ -187,28 +183,26 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER IN TARGET (Check ទាំង Container និង Workspace)
+-- HOVER
 -- ==================================================
 local function FindHoverInTarget()
-    if not TARGET_ID then return nil, nil end
+    if not TARGET_ID then return nil end
     
-    -- Check Container មុន
     if Container then
         local Slot = Container:FindFirstChild(TARGET_ID)
         if Slot then
             local Hover = Slot:FindFirstChild("AreaEggHover")
-            if Hover then return Hover, "container" end
+            if Hover then return Hover end
         end
     end
 
-    -- Check Workspace
     local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then
         local Hover = WSEgg:FindFirstChild("AreaEggHover")
-        if Hover then return Hover, "workspace" end
+        if Hover then return Hover end
     end
 
-    return nil, nil
+    return nil
 end
 
 -- ==================================================
@@ -244,7 +238,7 @@ local function FindSmartPromptNearTarget(EggPos)
 end
 
 -- ==================================================
--- CAMERA FORCE
+-- CAMERA
 -- ==================================================
 local function ForceCameraToEgg(EggPos, Distance)
     if not Camera then return end
@@ -293,7 +287,7 @@ local function FaceEgg(EggPos)
 end
 
 -- ==================================================
--- PROMPT TARGET
+-- PROMPT
 -- ==================================================
 local function PromptTarget()
     if not TargetPromptPart then return end
@@ -418,37 +412,12 @@ end
 -- FLY TO SAFE ZONE
 -- ==================================================
 local function FlyToSafeZone()
-    GoingToSafe = true
     CurrentStep = "to_safe"
     ResetCamera()
 
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
         CurrentStep = "stop"
     end)
-end
-
--- ==================================================
--- RESET STATE RETRY (Round #1 → Round #2)
--- ==================================================
-local function ResetStateRetry()
-    TargetEgg = nil
-    TargetPromptPart = nil
-    TargetHover = nil
-    LockStartTime = 0
-    CurrentZoom = CAMERA_DISTANCE
-    WaitingRetry = false
-    RetryStartTime = 0
-    GoingToSafe = false
-
-    -- Reset សម្រាប់ Round ថ្មី
-    SavedYBefore = nil
-    CollectDone = false
-
-    CleanupMovers()
-    ResetCamera()
-
-    CurrentStep = "idle"
-    print("[YOKUDO] State Reset - Retry #" .. (CollectCount + 1))
 end
 
 -- ==================================================
@@ -465,10 +434,9 @@ local function FullReset()
     CurrentZoom = CAMERA_DISTANCE
     SavedYBefore = nil
     CollectDone = false
-    WaitingRetry = false
-    RetryStartTime = 0
-    GoingToSafe = false
     CollectCount = 0
+    LastHoverCheck = 0
+    HoverFound = false
 
     CleanupMovers()
     if ActiveHeartbeat then
@@ -486,7 +454,32 @@ local function FullReset()
 end
 
 -- ==================================================
--- HEARTBEAT (Active)
+-- START ROUND (Round #1 និង #2 ដូចគ្នា)
+-- ==================================================
+local function StartRound(Egg)
+    if not Egg then return end
+    
+    TargetEgg = Egg
+    CurrentZoom = CAMERA_DISTANCE
+    TargetPromptPart = nil
+    SavedYBefore = nil
+    CollectDone = false
+    LastHoverCheck = 0
+    HoverFound = false
+
+    local EggPos = GetEggPosition(Egg)
+    if not EggPos then return end
+
+    CurrentStep = "to_egg"
+
+    FlyTP(EggPos, FLY_SPEED, true, function()
+        LockStartTime = tick()
+        CurrentStep = "lock_egg"
+    end)
+end
+
+-- ==================================================
+-- HEARTBEAT
 -- ==================================================
 local function StartActiveHeartbeat()
     if ActiveHeartbeat then
@@ -501,22 +494,7 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- WAIT RETRY (2s before retry)
-        if WaitingRetry then
-            local Elapsed = tick() - RetryStartTime
-
-            if Elapsed >= RETRY_WAIT then
-                if CollectCount >= COLLECT_TARGET then
-                    WaitingRetry = false
-                    FlyToSafeZone()
-                else
-                    ResetStateRetry()
-                end
-            end
-            return
-        end
-
-        -- FAST Y CHECK (Confirm Collect)
+        -- FAST Y CHECK
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
@@ -524,21 +502,30 @@ local function StartActiveHeartbeat()
             CurrentY = GetEggY(CurrentEgg)
         end
 
+        -- CHECK Y CHANGE (Collect Confirmed)
         if SavedYBefore and CurrentY and not CollectDone then
             if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
                 CollectDone = true
                 CollectCount = CollectCount + 1
 
-                if CollectCount >= COLLECT_TARGET then
+                if CollectCount >= MAX_COLLECT then
+                    -- Done all → Fly to Safe Zone
                     FlyToSafeZone()
                 else
-                    WaitingRetry = true
-                    RetryStartTime = tick()
+                    -- Round #1 done → Fly ទៅ Egg ថ្មីភ្លាម
+                    task.wait(0.5)  -- រង់ចាំបន្តិចឱ្យ Egg ថ្មី Load
+                    
+                    local NextEgg = FindEggInWorkspace() or FindEggInContainer()
+                    if NextEgg then
+                        StartRound(NextEgg)
+                    else
+                        CurrentStep = "idle"
+                    end
                 end
             end
         end
 
-        -- LOCK + FACE + CAMERA + HOVER + PROMPT
+        -- LOCK + FACE + CAMERA + HOVER + PROMPT (Loop)
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -552,6 +539,7 @@ local function StartActiveHeartbeat()
                 return
             end
 
+            -- Lock distance = 0 + Face + Camera Zoom
             Root.CFrame = CFrame.new(EggPos)
             Root.AssemblyLinearVelocity = Vector3.zero
             Root.AssemblyAngularVelocity = Vector3.zero
@@ -559,30 +547,31 @@ local function StartActiveHeartbeat()
             FaceEgg(EggPos)
             ForceCameraToEgg(EggPos, CurrentZoom)
 
-            local Elapsed = tick() - LockStartTime
+            -- Check Hover រាល់ HOVER_CHECK_INTERVAL
+            local now = tick()
+            if now - LastHoverCheck >= HOVER_CHECK_INTERVAL then
+                LastHoverCheck = now
 
-            if Elapsed >= LOCK_WAIT then
-                local Y = GetEggY(TargetEgg)
-                if Y and not SavedYBefore then
-                    SavedYBefore = Y
-                end
-
-                local Hover2, HoverSource = FindHoverInTarget()
+                local Hover2 = FindHoverInTarget()
 
                 if Hover2 then
                     TargetHover = Hover2
+                    HoverFound = true
 
                     if not TargetPromptPart then
                         TargetPromptPart = FindSmartPromptNearTarget(EggPos)
                     end
 
                     if TargetPromptPart then
-                        PromptTarget()
+                        PromptTarget()  -- Fire Prompt ភ្លាម
                     end
                 else
-                    CurrentZoom = CurrentZoom - CAMERA_ZOOM_STEP
-                    if CurrentZoom < CAMERA_MIN_DISTANCE then
-                        CurrentZoom = CAMERA_MIN_DISTANCE
+                    -- Zoom បន្តិចម្តងៗ
+                    if CurrentZoom > CAMERA_MIN_DISTANCE then
+                        CurrentZoom = CurrentZoom - CAMERA_ZOOM_STEP
+                        if CurrentZoom < CAMERA_MIN_DISTANCE then
+                            CurrentZoom = CAMERA_MIN_DISTANCE
+                        end
                     end
                 end
             end
@@ -597,7 +586,7 @@ local function StartActiveHeartbeat()
 end
 
 -- ==================================================
--- MAIN LOOP (Check Egg → Fly TP)
+-- MAIN LOOP (Start Round #1)
 -- ==================================================
 local function StartMainLoop()
     if MainLoop then
@@ -612,28 +601,11 @@ local function StartMainLoop()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        if WaitingRetry then return end
-        if GoingToSafe then return end
-
-        local CachedEgg, EggSource = FindEggAnywhere()
-
-        if CurrentStep == "idle" and CachedEgg then
-            local EggPos = GetEggPosition(CachedEgg)
-            if EggPos then
-                local Dist = GetEggDistance(CachedEgg)
-                if Dist > MIN_FLY_DISTANCE then
-                    TargetEgg = CachedEgg
-                    CurrentZoom = CAMERA_DISTANCE
-                    TargetPromptPart = nil
-                    SavedYBefore = nil
-
-                    CurrentStep = "to_egg"
-
-                    FlyTP(EggPos, FLY_SPEED, true, function()
-                        LockStartTime = tick()
-                        CurrentStep = "lock_egg"
-                    end)
-                end
+        -- Start Round #1 (Container)
+        if CurrentStep == "idle" and CollectCount == 0 then
+            local CachedEgg = FindEggInContainer()
+            if CachedEgg then
+                StartRound(CachedEgg)
             end
         end
     end)
@@ -652,8 +624,6 @@ local function Enable()
     CollectDone = false
     SavedYBefore = nil
     TargetPromptPart = nil
-    WaitingRetry = false
-    GoingToSafe = false
     CollectCount = 0
     SaveStats()
 
@@ -690,4 +660,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded")
+print("✅ TeleportSystem Feature Loaded (Round 1 & 2 Same Flow)")
