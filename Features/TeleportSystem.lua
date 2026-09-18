@@ -1,7 +1,7 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
 -- Egg Collect + Fast Return to Safe
--- Camera Lock ជាប់រហូតដល់បាន Egg លើកទី 2
+-- Camera Lock + Reset on 2nd Egg
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -143,7 +143,7 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG
+-- FIND EGG (Check ទាំង Container និង Workspace)
 -- ==================================================
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
@@ -421,15 +421,17 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
 end
 
 -- ==================================================
--- FLY TO SAFE ZONE (Reset Camera ពេលទៅដល់)
+-- FLY TO SAFE ZONE (Reset Camera មុនពេល Fly)
 -- ==================================================
 local function FlyToSafeZone()
     GoingToSafe = true
     CurrentStep = "to_safe"
 
+    -- Reset Camera មុនពេល Fly ទៅ Safe Zone
+    ResetCamera()
+
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
-        -- ទៅដល់ Safe Zone → Reset Camera
-        ResetCamera()
+        -- ដល់ Safe Zone - មិន Reset Camera ទេ (Reset រួចហើយ)
         CurrentStep = "stop"
     end)
 end
@@ -719,4 +721,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Camera Lock until 2nd Collect)")
+print("✅ TeleportSystem Feature Loaded (Camera Lock + Reset on 2nd Egg)")
