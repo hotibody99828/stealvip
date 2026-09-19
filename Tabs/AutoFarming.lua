@@ -32,7 +32,6 @@ GetEggBoxStroke.Thickness = 1.5
 GetEggBoxStroke.Transparency = 0.4
 GetEggBoxStroke.Parent = GetEggBox
 
--- Icon
 local GetEggIcon = Instance.new("ImageLabel")
 GetEggIcon.Size = UDim2.new(0, 40, 0, 40)
 GetEggIcon.Position = UDim2.new(0, 10, 0.5, -20)
@@ -45,7 +44,6 @@ local GetEggIconCorner = Instance.new("UICorner")
 GetEggIconCorner.CornerRadius = UDim.new(0, 6)
 GetEggIconCorner.Parent = GetEggIcon
 
--- Name
 local GetEggName = Instance.new("TextLabel")
 GetEggName.Size = UDim2.new(1, -140, 0, 16)
 GetEggName.Position = UDim2.new(0, 58, 0, 10)
@@ -57,7 +55,6 @@ GetEggName.TextXAlignment = Enum.TextXAlignment.Left
 GetEggName.Font = Enum.Font.GothamBold
 GetEggName.Parent = GetEggBox
 
--- Rate
 local GetEggRate = Instance.new("TextLabel")
 GetEggRate.Size = UDim2.new(1, -140, 0, 16)
 GetEggRate.Position = UDim2.new(0, 58, 0, 30)
@@ -69,7 +66,6 @@ GetEggRate.TextXAlignment = Enum.TextXAlignment.Left
 GetEggRate.Font = Enum.Font.Gotham
 GetEggRate.Parent = GetEggBox
 
--- Checkbox
 local GetEggCheckButton = Instance.new("TextButton")
 GetEggCheckButton.Size = UDim2.new(0, 34, 0, 34)
 GetEggCheckButton.Position = UDim2.new(1, -44, 0.5, -17)
@@ -102,21 +98,11 @@ GetEggCheck.Parent = GetEggCheckButton
 local SelectedEggId = nil
 local GetEggEnabled = false
 
--- Update Box (ភ្លាមៗ)
 local function UpdateGetEggBox(Icon, Name, Rate, EggId)
     GetEggIcon.Image = Icon or ""
     GetEggName.Text = Name or "No Egg Selected"
     GetEggRate.Text = "$" .. (_G.YOKUDO_AutoFarm and _G.YOKUDO_AutoFarm.FormatMoney(Rate or 0) or tostring(Rate or 0)) .. "/s"
     SelectedEggId = EggId
-    
-    -- Animation ពេល Update
-    GetEggIcon.ImageTransparency = 1
-    GetEggName.TextTransparency = 1
-    GetEggRate.TextTransparency = 1
-    
-    TweenService:Create(GetEggIcon, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
-    TweenService:Create(GetEggName, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
-    TweenService:Create(GetEggRate, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
 end
 
 local function ToggleGetEgg()
@@ -126,7 +112,15 @@ local function ToggleGetEgg()
         GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         GetEggCheckButton.BackgroundTransparency = 0
         GetEggCheckStroke.Color = Color3.fromRGB(135, 120, 225)
+        
         if SelectedEggId and _G.YOKUDO_TeleportSystem then
+            -- បើកំពុង Run → Stop មុន
+            if _G.YOKUDO_TeleportSystem.IsEnabled() then
+                _G.YOKUDO_TeleportSystem.Disable()
+                task.wait(0.2)
+            end
+            
+            -- Set Target ថ្មី និង Start
             _G.YOKUDO_TeleportSystem.SetTargetId(SelectedEggId)
             _G.YOKUDO_TeleportSystem.Enable()
         end
@@ -134,6 +128,7 @@ local function ToggleGetEgg()
         GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         GetEggCheckButton.BackgroundTransparency = 0.85
         GetEggCheckStroke.Color = Color3.fromRGB(255, 255, 255)
+        
         if _G.YOKUDO_TeleportSystem then
             _G.YOKUDO_TeleportSystem.Disable()
             _G.YOKUDO_TeleportSystem.ResetState()
