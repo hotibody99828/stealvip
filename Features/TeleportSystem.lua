@@ -1,6 +1,7 @@
 --==================================================
--- YOKUDO HUB - TELEPORT SYSTEM (FIXED SHAKE)
--- 2 Rounds Y + Remote Collect
+-- YOKUDO HUB - EGG COLLECT (FIX TELEPORT SHAKE)
+-- Fix: Shot TP + Arrive conflict
+-- Use Flag to prevent double teleport
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
 --==================================================
@@ -10,6 +11,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
+
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
 --==================================================
@@ -34,11 +36,11 @@ print("[YOKUDO] Event found:", Event.ClassName)
 -- SETTINGS
 --==================================================
 
-local TARGET_ID = nil
+local TARGET_ID = nil -- យកពី SetTargetId()
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
 local FLY_SPEED = 1100
-local RETURN_SPEED = 1000
+local RETURN_SPEED = 1100
 local FLY_OFFSET = 3
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -239,7 +241,11 @@ local function RemoteCollectEgg()
         })
     end)
 
-    return success
+    if success then
+        return true
+    else
+        return false
+    end
 end
 
 --==================================================
@@ -314,7 +320,7 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
     BodyGyro.Parent = Root
 
     local StartTime = tick()
-    local Teleported = false
+    local Teleported = false   -- FIX: Flag ដើម្បីកុំ Teleport ស្ទួន
 
     FlyConnection = RunService.Heartbeat:Connect(function()
         if not Running then
@@ -340,7 +346,7 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
         local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE
+        -- SAFE ZONE (Shot TP)
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE and not Teleported then
                 Teleported = true
@@ -356,7 +362,7 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             end
         end
 
-        -- SHOT TP
+        -- SHOT TP (ដំបូងតែម្តង)
         if UseShotTP and HorizDist <= SHOT_DISTANCE and not Teleported then
             Teleported = true
             CleanupMovers()
@@ -374,11 +380,13 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             return
         end
 
+        -- បើ Teleport រួច → Stop
         if Teleported then
             CleanupMovers()
             return
         end
 
+        -- Timeout
         if tick() - StartTime > 15 then
             CleanupMovers()
             Hum2.PlatformStand = false
@@ -397,7 +405,7 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
 end
 
 --==================================================
--- AUTO COLLECT
+-- AUTO COLLECT (Heartbeat)
 --==================================================
 
 local function StartAutoCollect()
