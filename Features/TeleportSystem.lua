@@ -1,44 +1,34 @@
---==================================================
--- YOKUDO HUB - EGG COLLECT (Y CHANGE 2 ROUNDS)
--- Round 1: Fly TP + Lock Behind 3 + Save Y + Collect
--- Y Change (1) -> Save YChanged -> Wait Y Return
--- Round 2: Y Return -> Fly TP + Lock Behind 3 + Collect
--- Y Change (2) -> Fly TP Safe Zone
--- Safe Zone: (533, 70, -366)
---==================================================
+-- ==================================================
+-- YOKUDO HUB | FEATURE | Teleport System
+-- Remote Collect + 2 Rounds Y
+-- ==================================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
---==================================================
--- EVENT
---==================================================
-
+-- ==================================================
+-- EVENT (Remote Function)
+-- ==================================================
 local Event = nil
 
 local success, result = pcall(function()
     return ReplicatedStorage.Packages.Networking["RF/EggWorld/AskFieldEggCarry"]
 end)
 
-if not success or not result then
+if success and result then
+    Event = result
+    print("[YOKUDO] Event found:", Event.ClassName)
+else
     warn("[YOKUDO] Event not found")
-    return
 end
 
-Event = result
-print("[YOKUDO] Event found:", Event.ClassName)
-
---==================================================
+-- ==================================================
 -- SETTINGS
---==================================================
-
-local TARGET_UID = nil -- ចាំ Auto Farming ផ្ញើមក
+-- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
 local FLY_SPEED = 500
@@ -56,7 +46,10 @@ local Y_RETURN_THRESHOLD = 1
 local LOOP_INTERVAL = 0.05
 local COLLECT_INTERVAL = 0.01
 
--- TARGET
+-- ==================================================
+-- STATE
+-- ==================================================
+local TARGET_ID = nil
 local TargetEgg = nil
 local YOriginal = nil
 local YChanged = nil
@@ -66,16 +59,13 @@ local IsWaitingReturn = false
 local LockedCFrame = nil
 local IsLocked = false
 
---==================================================
--- STATE
---==================================================
-
 local Running = false
 local CurrentStep = "idle"
 local FlyConnection = nil
 local LockConnection = nil
 local CollectConnection = nil
 local HeartbeatConnection = nil
+local MainLoop = nil
 local BodyVelocity = nil
 local BodyGyro = nil
 
@@ -84,10 +74,9 @@ local SavedJumpPower = nil
 local SavedJumpHeight = nil
 local SavedUseJumpPower = nil
 
---==================================================
+-- ==================================================
 -- GET HUMANOID
---==================================================
-
+-- ==================================================
 local function GetHumanoid()
     local Char = Player.Character
     if not Char then return nil, nil end
@@ -96,10 +85,9 @@ local function GetHumanoid()
     return Hum, Root
 end
 
---==================================================
+-- ==================================================
 -- SAVE / RESTORE
---==================================================
-
+-- ==================================================
 local function SaveStats()
     local Hum = GetHumanoid()
     if not Hum then return end
@@ -118,10 +106,9 @@ local function RestoreStats()
     if SavedUseJumpPower ~= nil then pcall(function() Hum.UseJumpPower = SavedUseJumpPower end) end
 end
 
---==================================================
+-- ==================================================
 -- CLEANUP
---==================================================
-
+-- ==================================================
 local function CleanupMovers()
     if FlyConnection then
         FlyConnection:Disconnect()
@@ -155,28 +142,32 @@ local function CleanupMovers()
     IsLocked = false
 end
 
---==================================================
--- FIND EGG (ប្រើ TARGET_UID ដែល Auto Farming ផ្ញើមក)
---==================================================
-
+-- ==================================================
+-- FIND EGG
+-- ==================================================
 local function FindEggInContainer()
-    if not Container or not TARGET_UID then return nil end
-    local Direct = Container:FindFirstChild(TARGET_UID)
+    if not Container then return nil end
+    local Direct = Container:FindFirstChild(TARGET_ID)
     if Direct then return Direct end
     for _, Desc in ipairs(Container:GetDescendants()) do
-        if Desc.Name == TARGET_UID then return Desc end
+        if Desc.Name == TARGET_ID then return Desc end
     end
     return nil
 end
 
 local function FindEggInWorkspace()
-    if not TARGET_UID then return nil end
-    local WSEgg = workspace:FindFirstChild(TARGET_UID)
+    local WSEgg = workspace:FindFirstChild(TARGET_ID)
     if WSEgg then return WSEgg end
     for _, Desc in ipairs(workspace:GetChildren()) do
-        if Desc.Name == TARGET_UID then return Desc end
+        if Desc.Name == TARGET_ID then return Desc end
     end
     return nil
+end
+
+local function FindEggAnywhere()
+    local WSEgg = FindEggInWorkspace()
+    if WSEgg then return WSEgg end
+    return FindEggInContainer()
 end
 
 local function GetEggPosition(Egg)
@@ -205,10 +196,9 @@ local function GetEggDistance(Egg)
     return (EggPos - Root.Position).Magnitude
 end
 
---==================================================
+-- ==================================================
 -- GET LOCK POSITION (Behind Egg 3)
---==================================================
-
+-- ==================================================
 local function GetLockCFrame(EggPos)
     local Hum, Root = GetHumanoid()
     if not Root then return CFrame.new(EggPos + Vector3.new(0, FLY_OFFSET, 0)) end
@@ -227,30 +217,25 @@ local function GetLockCFrame(EggPos)
     return CFrame.new(LockPos, EggPos)
 end
 
---==================================================
+-- ==================================================
 -- REMOTE COLLECT
---==================================================
-
+-- ==================================================
 local function RemoteCollectEgg()
-    if not Event or not TARGET_UID then return false end
+    if not Event then return false end
+    if not TARGET_ID then return false end
 
     local success, result = pcall(function()
         return Event:InvokeServer({
-            Uid = TARGET_UID
+            Uid = TARGET_ID
         })
     end)
 
-    if success then
-        return true
-    else
-        return false
-    end
+    return success
 end
 
---==================================================
--- LOCK AT EGG (Behind 3)
---==================================================
-
+-- ==================================================
+-- LOCK AT EGG
+-- ==================================================
 local function StartLock(TargetCFrame)
     IsLocked = true
     LockedCFrame = TargetCFrame
@@ -285,11 +270,10 @@ local function StopLock()
     end
 end
 
---==================================================
+-- ==================================================
 -- FLY TP
---==================================================
-
-local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
+-- ==================================================
+local function FlyTP(Destination, Speed, UseShotTP, Callback)
     CleanupMovers()
 
     local Hum, Root = GetHumanoid()
@@ -348,12 +332,10 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE then
                 CleanupMovers()
-
                 Hum2.PlatformStand = false
                 Root2.CFrame = CFrame.new(SAFE_ZONE)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
-
                 if Callback then Callback() end
                 return
             end
@@ -362,32 +344,20 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
         if UseShotTP and HorizDist <= SHOT_DISTANCE and not ShotDone then
             ShotDone = true
             CleanupMovers()
-
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
-            if LockAfter then
-                StartLock(LockCFrame)
-            end
-
             if Callback then Callback() end
             return
         end
 
         if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
             CleanupMovers()
-
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
-            if LockAfter then
-                StartLock(LockCFrame)
-            end
-
             if Callback then Callback() end
             return
         end
@@ -409,10 +379,9 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
     end)
 end
 
---==================================================
--- AUTO COLLECT (Heartbeat 0.01s)
---==================================================
-
+-- ==================================================
+-- AUTO COLLECT
+-- ==================================================
 local function StartAutoCollect()
     if CollectConnection then
         CollectConnection:Disconnect()
@@ -437,10 +406,9 @@ local function StopAutoCollect()
     end
 end
 
---==================================================
+-- ==================================================
 -- HEARTBEAT - CHECK Y
---==================================================
-
+-- ==================================================
 local function StartHeartbeat()
     if HeartbeatConnection then
         HeartbeatConnection:Disconnect()
@@ -449,13 +417,12 @@ local function StartHeartbeat()
     HeartbeatConnection = RunService.Heartbeat:Connect(function()
         if not Running then return end
         if IsGoingSafe then return end
-        if not TARGET_UID then return end
 
         local Hum, Root = GetHumanoid()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        local CurrentEgg = workspace:FindFirstChild(TARGET_UID) or (Container and Container:FindFirstChild(TARGET_UID))
+        local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
         if CurrentEgg then
@@ -478,7 +445,7 @@ local function StartHeartbeat()
                     local EggPos = GetEggPosition(CurrentEgg)
                     if EggPos then
                         local LockCF = GetLockCFrame(EggPos)
-                        FlyTP(EggPos, FLY_SPEED, false, false, function()
+                        FlyTP(EggPos, FLY_SPEED, false, function()
                             StartLock(LockCF)
                             StartAutoCollect()
                         end)
@@ -488,7 +455,7 @@ local function StartHeartbeat()
             return
         end
 
-        -- CHECK Y CHANGE (Confirm)
+        -- CHECK Y CHANGE
         if CurrentY and YOriginal and not IsGoingSafe then
             local YDiff = math.abs(CurrentY - YOriginal)
 
@@ -512,7 +479,7 @@ local function StartHeartbeat()
 
                     IsGoingSafe = true
 
-                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
+                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
                         IsGoingSafe = false
                         FullReset()
                     end)
@@ -529,10 +496,9 @@ local function StopHeartbeat()
     end
 end
 
---==================================================
+-- ==================================================
 -- FULL RESET
---==================================================
-
+-- ==================================================
 function FullReset()
     Running = false
     CurrentStep = "idle"
@@ -552,45 +518,49 @@ function FullReset()
     StopHeartbeat()
     RestoreStats()
 
+    if MainLoop then
+        MainLoop:Disconnect()
+        MainLoop = nil
+    end
+
     print("[YOKUDO] Full Reset")
 end
 
---==================================================
+-- ==================================================
 -- MAIN LOOP
---==================================================
+-- ==================================================
+local function StartMainLoop()
+    if MainLoop then
+        MainLoop:Disconnect()
+        MainLoop = nil
+    end
 
-task.spawn(function()
-    while task.wait(LOOP_INTERVAL) do
-        if not Running then continue end
-        if IsGoingSafe then continue end
-        if IsWaitingReturn then continue end
-        if not TARGET_UID then continue end
+    MainLoop = RunService.Heartbeat:Connect(function()
+        if not Running then return end
+        if IsGoingSafe then return end
+        if IsWaitingReturn then return end
 
         local Hum, Root = GetHumanoid()
-        if not Hum or not Root then continue end
-        if Hum.Health <= 0 then continue end
+        if not Hum or not Root then return end
+        if Hum.Health <= 0 then return end
 
         local CachedSpawnEgg = FindEggInContainer()
         local CachedWSEgg = FindEggInWorkspace()
-
         local CurrentEgg = CachedWSEgg or CachedSpawnEgg
 
-        -- ROUND 1: IDLE - Find Egg
+        -- ROUND 1: IDLE
         if CurrentStep == "idle" and ConfirmCount == 0 then
-            local EggFound = CachedWSEgg or CachedSpawnEgg
-
-            if EggFound then
-                local EggPos = GetEggPosition(EggFound)
+            if CurrentEgg then
+                local EggPos = GetEggPosition(CurrentEgg)
                 if EggPos then
-                    local Dist = GetEggDistance(EggFound)
+                    local Dist = GetEggDistance(CurrentEgg)
                     if Dist > MIN_FLY_DISTANCE then
-                        TargetEgg = EggFound
-
-                        YOriginal = GetEggY(EggFound)
+                        TargetEgg = CurrentEgg
+                        YOriginal = GetEggY(CurrentEgg)
 
                         CurrentStep = "to_egg_1"
 
-                        FlyTP(EggPos, FLY_SPEED, false, false, function()
+                        FlyTP(EggPos, FLY_SPEED, false, function()
                             local LockCF = GetLockCFrame(EggPos)
                             StartLock(LockCF)
                             StartAutoCollect()
@@ -599,21 +569,21 @@ task.spawn(function()
                 end
             end
         end
-    end
-end)
+    end)
+end
 
---==================================================
--- ENABLE / DISABLE / SET TARGET
---==================================================
-
+-- ==================================================
+-- ENABLE / DISABLE
+-- ==================================================
 local function Enable()
     if Running then return end
-    if not TARGET_UID then
-        warn("[YOKUDO] No Target ID set!")
+    if not Event then
+        warn("[YOKUDO] Event not found - Cannot start")
         return
     end
 
     FullReset()
+
     Running = true
     CurrentStep = "idle"
     ConfirmCount = 0
@@ -624,8 +594,9 @@ local function Enable()
     SaveStats()
 
     StartHeartbeat()
+    StartMainLoop()
 
-    print("[YOKUDO] Teleport System: ON (Target: " .. tostring(TARGET_UID) .. ")")
+    print("[YOKUDO] Teleport System: ON")
 end
 
 local function Disable()
@@ -634,7 +605,7 @@ local function Disable()
 end
 
 local function SetTargetId(Id)
-    TARGET_UID = Id
+    TARGET_ID = Id
     print("[YOKUDO] Teleport System Target ID: " .. tostring(Id))
 end
 
@@ -648,15 +619,18 @@ local function GetState()
         Running = Running,
         CurrentStep = CurrentStep,
         ConfirmCount = ConfirmCount,
-        TargetId = TARGET_UID,
+        TargetId = TARGET_ID,
         YOriginal = YOriginal,
-        YChanged = YChanged
+        YChanged = YChanged,
+        IsLocked = IsLocked,
+        IsWaitingReturn = IsWaitingReturn,
+        IsGoingSafe = IsGoingSafe
     }
 end
 
---==================================================
+-- ==================================================
 -- EXPORT
---==================================================
+-- ==================================================
 _G.YOKUDO_TeleportSystem = {
     Enable = Enable,
     Disable = Disable,
@@ -664,10 +638,7 @@ _G.YOKUDO_TeleportSystem = {
     ResetState = ResetState,
     GetState = GetState,
     IsEnabled = function() return Running end,
-    GetTargetId = function() return TARGET_UID end
+    GetTargetId = function() return TARGET_ID end
 }
 
-print("[YOKUDO] Remote Collect loaded (2 Rounds Y)")
-print("[YOKUDO] Lock Behind:", LOCK_BEHIND)
-print("[YOKUDO] Min Fly Distance:", MIN_FLY_DISTANCE)
-print("[YOKUDO] Event:", Event)
+print("✅ TeleportSystem Feature Loaded (Remote Collect + 2 Rounds Y)")
