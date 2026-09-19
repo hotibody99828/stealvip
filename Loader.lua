@@ -213,9 +213,15 @@ Loading.Update(80)
 loadstring(GetScript("Features/TeleportSystem.lua"))()
 
 -- ==================================================
--- LOAD AUTO ATTACK
+-- LOAD AUTO FARM
 -- ==================================================
 Loading.Update(82)
+loadstring(GetScript("Features/AutoFarm.lua"))()
+
+-- ==================================================
+-- LOAD AUTO ATTACK
+-- ==================================================
+Loading.Update(84)
 loadstring(GetScript("Features/AutoAttack.lua"))()
 
 -- ==================================================
