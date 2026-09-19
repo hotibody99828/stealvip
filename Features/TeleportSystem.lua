@@ -29,8 +29,8 @@ end
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1100
-local RETURN_SPEED = 1000
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -41,7 +41,6 @@ local Y_CHANGE_THRESHOLD = 1
 
 local LOCK_WAIT = 0.2
 
-local LOOP_INTERVAL = 0.02
 local RETRY_WAIT = 2
 local COLLECT_TARGET = 2
 
@@ -60,6 +59,7 @@ local CollectDone = false
 local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
+local LastCollectTime = 0
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -137,15 +137,35 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG (Check ទាំង Container និង Workspace)
+-- FIND EGG (Container មុន បន្ទាប់មក Workspace)
 -- ==================================================
-local function FindEggAnywhere()
+local function FindEggInContainer()
     if not TARGET_ID then return nil end
     if Container then
-        local Egg = Container:FindFirstChild(TARGET_ID)
-        if Egg then return Egg end
+        return Container:FindFirstChild(TARGET_ID)
     end
-    local Egg = workspace:FindFirstChild(TARGET_ID)
+    return nil
+end
+
+local function FindEggInWorkspace()
+    if not TARGET_ID then return nil end
+    return workspace:FindFirstChild(TARGET_ID)
+end
+
+-- សម្រាប់ Fly TP: រក Egg ក្នុង Container មុន (Egg ថ្មី)
+local function FindEggForFly()
+    local Egg = FindEggInContainer()
+    if Egg then return Egg end
+    Egg = FindEggInWorkspace()
+    if Egg then return Egg end
+    return nil
+end
+
+-- សម្រាប់ Confirm Y: រក Egg ក្នុង Workspace មុន (Egg ដែលបាន Collect)
+local function FindEggForConfirm()
+    local Egg = FindEggInWorkspace()
+    if Egg then return Egg end
+    Egg = FindEggInContainer()
     if Egg then return Egg end
     return nil
 end
@@ -195,6 +215,12 @@ end
 local function CollectEgg()
     if not TARGET_ID then return false end
     
+    -- បើបាន Collect រួចហើយ → មិន Collect ម្តងទៀតទេ
+    local EggInContainer = FindEggInContainer()
+    if not EggInContainer then
+        return false
+    end
+    
     local Remote = GetAskFieldEggCarryRemote()
     if not Remote then
         warn("[YOKUDO] AskFieldEggCarry Remote not found")
@@ -209,6 +235,7 @@ local function CollectEgg()
     
     if Success then
         print("[YOKUDO] Collect Egg: " .. tostring(TARGET_ID) .. " | Result: " .. tostring(Result))
+        LastCollectTime = tick()
         return true
     else
         warn("[YOKUDO] Failed to Collect Egg: " .. tostring(Result))
@@ -333,17 +360,16 @@ local function FlyToSafeZone()
 
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
         CurrentStep = "stop"
-        FullReset()
     end)
 end
 
 -- ==================================================
--- RESET STATE RETRY (Round #1 → Round #2)
+-- RESET STATE RETRY
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
     LockStartTime = 0
-    SavedYBefore = nil -- Reset Y (សំខាន់!)
+    SavedYBefore = nil
     CollectDone = false
     WaitingRetry = false
     RetryStartTime = 0
@@ -370,6 +396,7 @@ local function FullReset()
     RetryStartTime = 0
     GoingToSafe = false
     CollectCount = 0
+    LastCollectTime = 0
 
     CleanupMovers()
     if ActiveHeartbeat then
@@ -407,7 +434,8 @@ local function StartFastConfirm()
             return
         end
 
-        local CurrentEgg = FindEggAnywhere()
+        -- រក Egg ក្នុង Workspace (Egg ដែលបាន Collect)
+        local CurrentEgg = FindEggInWorkspace()
         local CurrentY = nil
         if CurrentEgg then
             CurrentY = GetEggY(CurrentEgg)
@@ -522,7 +550,8 @@ local function StartMainLoop()
         if WaitingRetry then return end
         if GoingToSafe then return end
 
-        local CachedEgg = FindEggAnywhere()
+        -- រក Egg ក្នុង Container មុន (Egg ថ្មី)
+        local CachedEgg = FindEggForFly()
 
         if CurrentStep == "idle" and CachedEgg then
             local EggPos = GetEggPosition(CachedEgg)
@@ -530,7 +559,7 @@ local function StartMainLoop()
                 local Dist = GetEggDistance(CachedEgg)
                 if Dist > MIN_FLY_DISTANCE then
                     TargetEgg = CachedEgg
-                    SavedYBefore = nil -- Reset Y (សំខាន់!)
+                    SavedYBefore = nil
 
                     CurrentStep = "to_egg"
 
@@ -560,7 +589,7 @@ local function Enable()
     SaveStats()
     StartActiveHeartbeat()
     StartMainLoop()
-    print("[YOKUDO] Teleport System: ON (Remote)")
+    print("[YOKUDO] Teleport System: ON (Remote Only)")
 end
 
 local function Disable()
