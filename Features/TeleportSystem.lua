@@ -1,6 +1,6 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
--- Egg Collect via Remote (Lock 2 Distance + Fast Y Check)
+-- Egg Collect via Remote (Lock 3 + Fire 0.01s + Heartbeat Confirm)
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -29,19 +29,19 @@ end
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1100
-local RETURN_SPEED = 1100
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
 local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
-local ARRIVE_DISTANCE = 2          -- Lock ពីលើ 2 Distance
-local REMOTE_TRIGGER_DISTANCE = 6  -- Check Position ពេលនៅជិត 6 Distance
+local ARRIVE_DISTANCE = 3          -- Lock ពីលើ 3 Distance
+local REMOTE_TRIGGER_DISTANCE = 6  -- Fire Remote ពេលនៅក្រោម 6 Distance
 local SAFE_LOCK_DISTANCE = 3
 
 local MIN_FLY_DISTANCE = 3
-local Y_CHANGE_THRESHOLD = 0.1     -- Y Check លឿនបំផុត
+local Y_CHANGE_THRESHOLD = 0.01    -- Y Check លឿនបំផុត (Heartbeat)
 
-local REMOTE_INTERVAL = 0.02       -- Fire Remote លឿនបំផុត
-local RETRY_WAIT = 1
+local REMOTE_INTERVAL = 0.01       -- Fire Remote លឿនបំផុត (0.01s)
+local RETRY_WAIT = 2
 local COLLECT_TARGET = 2
 local CONFIRM_TIMEOUT = 3
 
@@ -185,10 +185,6 @@ end
 local function FireAskCarry()
     if not TARGET_ID then return false end
     
-    local now = tick()
-    if now - LastRemoteFire < REMOTE_INTERVAL then return false end
-    LastRemoteFire = now
-    
     local Remote = GetAskCarryRemote()
     if not Remote then return false end
     
@@ -202,7 +198,7 @@ local function FireAskCarry()
 end
 
 -- ==================================================
--- FLY TP (Lock 2 Distance ពីលើ)
+-- FLY TP (Lock 3 Distance ពីលើ)
 -- ==================================================
 local function FlyTP(Destination, Speed, UseShotTP, Callback)
     CleanupMovers()
@@ -284,13 +280,13 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
             return
         end
 
-        -- Lock ពីលើ 2 Distance
-        if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
+        -- Lock ពីលើ 3 Distance
+        if HorizDist <= ARRIVE_DISTANCE and VertDist <= 3 then
             CleanupMovers()
             Hum2.PlatformStand = false
             
-            -- Lock Position ពីលើ 2 Distance
-            local LockPos = Vector3.new(Destination.X, Destination.Y + 2, Destination.Z)
+            -- Lock Position ពីលើ 3 Distance
+            local LockPos = Vector3.new(Destination.X, Destination.Y + 3, Destination.Z)
             Root2.CFrame = CFrame.new(LockPos)
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
@@ -377,7 +373,7 @@ local function FullReset()
 end
 
 -- ==================================================
--- HEARTBEAT (Active)
+-- HEARTBEAT (Active) - Confirm + Fire Remote
 -- ==================================================
 local function StartActiveHeartbeat()
     if ActiveHeartbeat then
@@ -407,7 +403,7 @@ local function StartActiveHeartbeat()
         end
 
         -- ============================================
-        -- CONFIRM COLLECT (Y Check លឿនបំផុត)
+        -- CONFIRM COLLECT (Y Check លឿនបំផុត + Heartbeat)
         -- ============================================
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
@@ -416,7 +412,7 @@ local function StartActiveHeartbeat()
             CurrentY = GetEggY(CurrentEgg)
         end
 
-        -- Confirm 1: Y Change
+        -- Confirm 1: Y Change (លឿនបំផុត - Heartbeat)
         local YConfirmed = false
         if SavedYBefore and CurrentY and not CollectDone then
             if math.abs(CurrentY - SavedYBefore) >= Y_CHANGE_THRESHOLD then
@@ -446,7 +442,7 @@ local function StartActiveHeartbeat()
         end
 
         -- ============================================
-        -- LOCK + FIRE REMOTE (ពេលនៅជិត 6 Distance)
+        -- LOCK + FIRE REMOTE (ពេលនៅក្រោម 6 Distance)
         -- ============================================
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
@@ -464,7 +460,7 @@ local function StartActiveHeartbeat()
             -- Check Distance
             local Dist = GetEggDistance(TargetEgg)
 
-            -- បើនៅជិត 6 Distance → Fire Remote
+            -- បើនៅក្រោម 6 Distance → Fire Remote Loop 0.01s
             if Dist <= REMOTE_TRIGGER_DISTANCE then
                 -- Save Y Before
                 local Y = GetEggY(TargetEgg)
@@ -473,8 +469,12 @@ local function StartActiveHeartbeat()
                     LockStartTime = tick()
                 end
 
-                -- Fire Remote
-                FireAskCarry()
+                -- Fire Remote រាល់ 0.01s (Heartbeat)
+                local now = tick()
+                if now - LastRemoteFire >= REMOTE_INTERVAL then
+                    LastRemoteFire = now
+                    FireAskCarry()
+                end
             end
 
             -- Timeout: បើរង់ចាំយូរពេក → Reset
@@ -554,7 +554,7 @@ local function Enable()
     StartActiveHeartbeat()
     StartMainLoop()
 
-    print("[YOKUDO] Teleport System: ON (Lock 2 + Fast Y)")
+    print("[YOKUDO] Teleport System: ON (Lock 3 + Fire 0.01s + Heartbeat Confirm)")
 end
 
 local function Disable()
@@ -595,4 +595,4 @@ _G.YOKUDO_TeleportSystem = {
     GetAskCarryRemote = GetAskCarryRemote
 }
 
-print("✅ TeleportSystem Feature Loaded (Lock 2 + Fast Y)")
+print("✅ TeleportSystem Feature Loaded (Lock 3 + Fire 0.01s + Heartbeat Confirm)")
