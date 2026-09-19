@@ -1,7 +1,9 @@
 --==================================================
--- YOKUDO HUB - TELEPORT SYSTEM (IMPROVED)
--- Short TP សម្រាប់ Egg តែប៉ុណ្ណោះ
--- Fly TP ធម្មតាសម្រាប់ Safe Zone
+-- YOKUDO HUB - TELEPORT SYSTEM (FIXED ROUND 2)
+-- Round 1: Fly TP → Lock Behind 3 → Collect
+-- Y Change (1) → Wait Y Return
+-- Round 2: Y Return → Fly TP → Lock → Collect
+-- Y Change (2) → Fly TP Safe Zone
 -- TARGET_ID: From Auto Farming Tab
 --==================================================
 
@@ -35,8 +37,8 @@ print("[YOKUDO] Event found:", Event.ClassName)
 local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1000
-local RETURN_SPEED = 1000
+local FLY_SPEED = 1100
+local RETURN_SPEED = 1100
 local FLY_OFFSET = 3
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -59,6 +61,7 @@ local YChanged = nil
 local ConfirmCount = 0
 local IsGoingSafe = false
 local IsWaitingReturn = false
+local IsRound2Active = false -- Flag: Round 2 កំពុងដំណើរការ
 local LockedCFrame = nil
 local IsLocked = false
 
@@ -254,9 +257,9 @@ local function StopLock()
 end
 
 --==================================================
--- FLY TP (Short TP សម្រាប់ Egg)
+-- FLY TP (No Shake)
 --==================================================
-local function FlyTP_Egg(Destination, Callback)
+local function FlyTP(Destination, Speed, UseShotTP, Callback)
     CleanupMovers()
 
     local Hum, Root = GetHumanoid()
@@ -310,16 +313,28 @@ local function FlyTP_Egg(Destination, Callback)
         local HorizDist = Vector3.new(Direction.X, 0, Direction.Z).Magnitude
         local TotalDist = Direction.Magnitude
 
-        -- Short TP (ជិត 30 studs)
-        if HorizDist <= SHOT_DISTANCE and not Teleported then
+        -- SAFE ZONE (Shot TP)
+        if Speed == RETURN_SPEED then
+            if HorizDist <= SAFE_LOCK_DISTANCE and not Teleported then
+                Teleported = true
+                CleanupMovers()
+                Hum2.PlatformStand = false
+                Root2.CFrame = CFrame.new(SAFE_ZONE)
+                Root2.AssemblyLinearVelocity = Vector3.zero
+                Root2.AssemblyAngularVelocity = Vector3.zero
+                if Callback then Callback() end
+                return
+            end
+        end
+
+        -- SHOT TP (ដំបូងតែម្ដង)
+        if UseShotTP and HorizDist <= SHOT_DISTANCE and not Teleported then
             Teleported = true
             CleanupMovers()
-
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
             if Callback then Callback() end
             return
         end
@@ -337,99 +352,7 @@ local function FlyTP_Egg(Destination, Callback)
         end
 
         if TotalDist > 1 then
-            BodyVelocity.Velocity = Direction.Unit * 1100
-        else
-            BodyVelocity.Velocity = Vector3.zero
-        end
-
-        BodyGyro.CFrame = CFrame.new(CurrentPos, CurrentPos + Vector3.new(Direction.X, 0, Direction.Z))
-    end)
-end
-
---==================================================
--- FLY TP (Fly ធម្មតាសម្រាប់ Safe Zone)
---==================================================
-local function FlyTP_Safe(Destination, Callback)
-    CleanupMovers()
-
-    local Hum, Root = GetHumanoid()
-    if not Hum or not Root then return end
-    if Hum.Health <= 0 then return end
-
-    local FlyPos = Vector3.new(Destination.X, Destination.Y + FLY_OFFSET, Destination.Z)
-    local LockCFrame = CFrame.new(FlyPos)
-
-    Hum.PlatformStand = true
-    Hum.WalkSpeed = 0
-    Hum.JumpPower = 0
-
-    BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.Name = "YokudoBV"
-    BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    BodyVelocity.P = 1250
-    BodyVelocity.Velocity = Vector3.zero
-    BodyVelocity.Parent = Root
-
-    BodyGyro = Instance.new("BodyGyro")
-    BodyGyro.Name = "YokudoBG"
-    BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    BodyGyro.P = 3000
-    BodyGyro.D = 500
-    BodyGyro.CFrame = Root.CFrame
-    BodyGyro.Parent = Root
-
-    local StartTime = tick()
-    local Done = false
-
-    FlyConnection = RunService.Heartbeat:Connect(function()
-        if not Running then
-            CleanupMovers()
-            return
-        end
-
-        local Hum2, Root2 = GetHumanoid()
-        if not Hum2 or not Root2 then
-            CleanupMovers()
-            return
-        end
-        if Hum2.Health <= 0 then return end
-        if not BodyVelocity or not BodyGyro then
-            CleanupMovers()
-            return
-        end
-
-        local CurrentPos = Root2.Position
-        local Direction = (FlyPos - CurrentPos)
-        local TotalDist = Direction.Magnitude
-
-        -- Fly ធម្មតា - ដល់ទីតាំងពិត
-        if TotalDist <= ARRIVE_DISTANCE and not Done then
-            Done = true
-            CleanupMovers()
-
-            Hum2.PlatformStand = false
-            Root2.CFrame = LockCFrame
-            Root2.AssemblyLinearVelocity = Vector3.zero
-            Root2.AssemblyAngularVelocity = Vector3.zero
-
-            if Callback then Callback() end
-            return
-        end
-
-        if Done then
-            CleanupMovers()
-            return
-        end
-
-        if tick() - StartTime > 15 then
-            CleanupMovers()
-            Hum2.PlatformStand = false
-            if Callback then Callback() end
-            return
-        end
-
-        if TotalDist > 1 then
-            BodyVelocity.Velocity = Direction.Unit * RETURN_SPEED
+            BodyVelocity.Velocity = Direction.Unit * Speed
         else
             BodyVelocity.Velocity = Vector3.zero
         end
@@ -461,6 +384,54 @@ local function StopAutoCollect()
 end
 
 --==================================================
+-- START ROUND 1
+--==================================================
+local function StartRound1(EggFound)
+    TargetEgg = EggFound
+    YOriginal = GetEggY(EggFound)
+
+    CurrentStep = "to_egg_1"
+
+    local EggPos = GetEggPosition(EggFound)
+    if EggPos then
+        local LockCF = GetLockCFrame(EggPos)
+        FlyTP(EggPos, FLY_SPEED, false, function()
+            StartLock(LockCF)
+            StartAutoCollect()
+            print("[YOKUDO] Round 1: Locked & Collecting")
+        end)
+    end
+end
+
+--==================================================
+-- START ROUND 2
+--==================================================
+local function StartRound2()
+    IsWaitingReturn = false
+    IsRound2Active = true
+    YChanged = nil
+    CurrentStep = "to_egg_2"
+
+    local CurrentEgg = workspace:FindFirstChild(TARGET_ID) or (Container and Container:FindFirstChild(TARGET_ID))
+    if CurrentEgg then
+        TargetEgg = CurrentEgg
+        local EggPos = GetEggPosition(CurrentEgg)
+        if EggPos then
+            local LockCF = GetLockCFrame(EggPos)
+            FlyTP(EggPos, FLY_SPEED, false, function()
+                StartLock(LockCF)
+                StartAutoCollect()
+                print("[YOKUDO] Round 2: Locked & Collecting")
+            end)
+        end
+    else
+        -- Egg បាត់ → ព្យាយាមម្តងទៀត
+        task.wait(0.5)
+        StartRound2()
+    end
+end
+
+--==================================================
 -- HEARTBEAT - CHECK Y (លឿន + ច្បាស់)
 --==================================================
 local function StartHeartbeat()
@@ -487,19 +458,8 @@ local function StartHeartbeat()
                 local YDiff = math.abs(CurrentY - YOriginal)
 
                 if YDiff <= Y_RETURN_THRESHOLD then
-                    IsWaitingReturn = false
-                    TargetEgg = CurrentEgg
-                    YChanged = nil
-                    CurrentStep = "to_egg_2"
-
-                    local EggPos = GetEggPosition(CurrentEgg)
-                    if EggPos then
-                        local LockCF = GetLockCFrame(EggPos)
-                        FlyTP_Egg(EggPos, function()
-                            StartLock(LockCF)
-                            StartAutoCollect()
-                        end)
-                    end
+                    -- Y ត្រឡប់មកដើម → Start Round 2
+                    StartRound2()
                 end
             end
             return
@@ -510,6 +470,7 @@ local function StartHeartbeat()
             local YDiff = math.abs(CurrentY - YOriginal)
 
             if YDiff >= Y_CHANGE_THRESHOLD then
+                -- Y Change លើកទី 1 (Round 1 Collect)
                 if ConfirmCount == 0 then
                     ConfirmCount = 1
                     YChanged = CurrentY
@@ -521,18 +482,24 @@ local function StartHeartbeat()
                     TargetEgg = nil
                     CurrentStep = "idle"
 
-                elseif ConfirmCount == 1 then
+                    print("[YOKUDO] Round 1: Y Changed! Waiting for Y Return")
+
+                -- Y Change លើកទី 2 (Round 2 Collect → Safe)
+                elseif ConfirmCount == 1 and IsRound2Active then
                     ConfirmCount = 2
+                    IsRound2Active = false
 
                     StopAutoCollect()
                     StopLock()
 
                     IsGoingSafe = true
 
-                    -- Fly ធម្មតាទៅ Safe Zone
-                    FlyTP_Safe(SAFE_ZONE, function()
+                    print("[YOKUDO] Round 2: Y Changed! Fly to Safe Zone")
+
+                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
                         IsGoingSafe = false
                         FullReset()
+                        print("[YOKUDO] Safe Zone: Reset Complete")
                     end)
                 end
             end
@@ -557,6 +524,7 @@ function FullReset()
     ConfirmCount = 0
     IsGoingSafe = false
     IsWaitingReturn = false
+    IsRound2Active = false
     LockedCFrame = nil
     IsLocked = false
 
@@ -581,6 +549,7 @@ local function StartMainLoop()
         if not Running then return end
         if IsGoingSafe then return end
         if IsWaitingReturn then return end
+        if IsRound2Active then return end
 
         local Hum, Root = GetHumanoid()
         if not Hum or not Root then return end
@@ -598,16 +567,7 @@ local function StartMainLoop()
                 if EggPos then
                     local Dist = GetEggDistance(EggFound)
                     if Dist > MIN_FLY_DISTANCE then
-                        TargetEgg = EggFound
-                        YOriginal = GetEggY(EggFound)
-
-                        CurrentStep = "to_egg_1"
-
-                        local LockCF = GetLockCFrame(EggPos)
-                        FlyTP_Egg(EggPos, function()
-                            StartLock(LockCF)
-                            StartAutoCollect()
-                        end)
+                        StartRound1(EggFound)
                     end
                 end
             end
@@ -630,6 +590,7 @@ local function Enable()
     ConfirmCount = 0
     IsGoingSafe = false
     IsWaitingReturn = false
+    IsRound2Active = false
     YOriginal = nil
     YChanged = nil
     SaveStats()
@@ -667,4 +628,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Short TP for Egg + Fly TP for Safe)")
+print("✅ TeleportSystem Feature Loaded (Fixed Round 2)")
