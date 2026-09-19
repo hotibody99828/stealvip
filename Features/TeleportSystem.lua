@@ -2,6 +2,7 @@
 -- YOKUDO HUB - EGG COLLECT (2 ROUNDS Y) - WALK TP
 -- Walk TP + Shot TP 30 + Lock Behind 3
 -- Fix: Shot TP → Lock immediately (No overshoot)
+-- Fast Reset on Stop / Safe Zone
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
 --==================================================
@@ -277,7 +278,7 @@ local function StopLock()
 end
 
 --==================================================
--- WALK TP (with Shot TP 30 + Lock)
+-- WALK TP (with Shot TP 30 + Lock + Fast Reset)
 --==================================================
 
 local function WalkTP(Destination, Speed, UseShotTP, LockAfter, Callback)
@@ -341,7 +342,7 @@ local function WalkTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             return
         end
 
-        -- SAFE ZONE
+        -- SAFE ZONE (Fast Reset)
         if Speed == RETURN_SPEED then
             if Distance <= SAFE_LOCK_DISTANCE then
                 IsFinished = true
@@ -353,6 +354,10 @@ local function WalkTP(Destination, Speed, UseShotTP, LockAfter, Callback)
                 Root2.CFrame = CFrame.new(SAFE_ZONE)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
+
+                -- Fast Reset
+                IsGoingSafe = false
+                FullReset()
 
                 if Callback then Callback() end
                 return
@@ -491,8 +496,7 @@ local function StartHeartbeat()
                     IsGoingSafe = true
 
                     WalkTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
-                        IsGoingSafe = false
-                        FullReset()
+                        -- Fast Reset (មិនត្រូវការធ្វើអ្វីទៀតទេ ព្រោះ WalkTP បាន FullReset រួច)
                     end)
                 end
             end
@@ -508,32 +512,64 @@ local function StopHeartbeat()
 end
 
 --==================================================
--- FULL RESET
+-- FULL RESET (Fast)
 --==================================================
 
 function FullReset()
+    -- 1. Set Flags ភ្លាមៗ (ដើម្បីឱ្យ Loop ឈប់)
     Running = false
     CurrentStep = "idle"
+    IsGoingSafe = false
+    IsWaitingReturn = false
+    IsLocked = false
 
     TargetEgg = nil
     YOriginal = nil
     YChanged = nil
     ConfirmCount = 0
-    IsGoingSafe = false
-    IsWaitingReturn = false
     LockedCFrame = nil
-    IsLocked = false
 
-    CleanupMovers()
-    StopLock()
-    StopAutoCollect()
-    StopHeartbeat()
-    RestoreStats()
-
+    -- 2. Disconnect Connections ភ្លាមៗ
+    if WalkConnection then
+        WalkConnection:Disconnect()
+        WalkConnection = nil
+    end
+    if LockConnection then
+        LockConnection:Disconnect()
+        LockConnection = nil
+    end
+    if CollectConnection then
+        CollectConnection:Disconnect()
+        CollectConnection = nil
+    end
+    if HeartbeatConnection then
+        HeartbeatConnection:Disconnect()
+        HeartbeatConnection = nil
+    end
     if MainLoopConnection then
         MainLoopConnection:Disconnect()
         MainLoopConnection = nil
     end
+
+    -- 3. Cleanup Movers ភ្លាមៗ
+    local Hum, Root = GetHumanoid()
+    if Hum then
+        pcall(function()
+            Hum.PlatformStand = false
+            if Root then
+                Hum:MoveTo(Root.Position)
+            end
+        end)
+    end
+    if Root then
+        pcall(function()
+            Root.AssemblyLinearVelocity = Vector3.zero
+            Root.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+
+    -- 4. Restore Stats (មិនត្រូវការភ្លាមៗ)
+    pcall(RestoreStats)
 
     print("[YOKUDO] Full Reset")
 end
@@ -582,7 +618,7 @@ local function StartMainLoop()
 end
 
 --==================================================
--- ENABLE / DISABLE
+-- ENABLE / DISABLE (Fast)
 --==================================================
 
 local function Enable()
@@ -608,8 +644,9 @@ local function Enable()
 end
 
 local function Disable()
+    -- Reset ភ្លាមៗ
     FullReset()
-    print("[YOKUDO] Teleport System: OFF")
+    print("[YOKUDO] Teleport System: OFF (Fast Reset)")
 end
 
 local function SetTargetId(Id)
@@ -635,4 +672,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Walk TP + Shot TP 30)")
+print("✅ TeleportSystem Feature Loaded (Walk TP + Fast Reset)")
