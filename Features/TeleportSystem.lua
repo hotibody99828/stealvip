@@ -29,10 +29,10 @@ end
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 500
-local RETURN_SPEED = 350
+local FLY_SPEED = 1100
+local RETURN_SPEED = 1100
 local FLY_OFFSET = 15
-local SHOT_DISTANCE = 30
+local SHOT_DISTANCE = 50
 local ARRIVE_DISTANCE = 2          -- Lock ពីលើ 2 Distance
 local REMOTE_TRIGGER_DISTANCE = 6  -- Check Position ពេលនៅជិត 6 Distance
 local SAFE_LOCK_DISTANCE = 3
