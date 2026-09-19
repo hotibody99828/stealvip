@@ -1,6 +1,6 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
--- Remote Collect + 2 Rounds Y
+-- Remote Collect + 2 Rounds Y (Logic ដើម)
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -164,12 +164,6 @@ local function FindEggInWorkspace()
     return nil
 end
 
-local function FindEggAnywhere()
-    local WSEgg = FindEggInWorkspace()
-    if WSEgg then return WSEgg end
-    return FindEggInContainer()
-end
-
 local function GetEggPosition(Egg)
     if not Egg then return nil end
     if Egg:IsA("Model") then
@@ -273,7 +267,7 @@ end
 -- ==================================================
 -- FLY TP
 -- ==================================================
-local function FlyTP(Destination, Speed, UseShotTP, Callback)
+local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
     CleanupMovers()
 
     local Hum, Root = GetHumanoid()
@@ -332,10 +326,12 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE then
                 CleanupMovers()
+
                 Hum2.PlatformStand = false
                 Root2.CFrame = CFrame.new(SAFE_ZONE)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
+
                 if Callback then Callback() end
                 return
             end
@@ -344,20 +340,32 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         if UseShotTP and HorizDist <= SHOT_DISTANCE and not ShotDone then
             ShotDone = true
             CleanupMovers()
+
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
+
+            if LockAfter then
+                StartLock(LockCFrame)
+            end
+
             if Callback then Callback() end
             return
         end
 
         if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
             CleanupMovers()
+
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
+
+            if LockAfter then
+                StartLock(LockCFrame)
+            end
+
             if Callback then Callback() end
             return
         end
@@ -380,7 +388,7 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
 end
 
 -- ==================================================
--- AUTO COLLECT
+-- AUTO COLLECT (Heartbeat)
 -- ==================================================
 local function StartAutoCollect()
     if CollectConnection then
@@ -422,7 +430,7 @@ local function StartHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        local CurrentEgg = FindEggAnywhere()
+        local CurrentEgg = workspace:FindFirstChild(TARGET_ID) or (Container and Container:FindFirstChild(TARGET_ID))
         local CurrentY = nil
 
         if CurrentEgg then
@@ -445,7 +453,7 @@ local function StartHeartbeat()
                     local EggPos = GetEggPosition(CurrentEgg)
                     if EggPos then
                         local LockCF = GetLockCFrame(EggPos)
-                        FlyTP(EggPos, FLY_SPEED, false, function()
+                        FlyTP(EggPos, FLY_SPEED, false, false, function()
                             StartLock(LockCF)
                             StartAutoCollect()
                         end)
@@ -479,7 +487,7 @@ local function StartHeartbeat()
 
                     IsGoingSafe = true
 
-                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
+                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
                         IsGoingSafe = false
                         FullReset()
                     end)
@@ -560,7 +568,7 @@ local function StartMainLoop()
 
                         CurrentStep = "to_egg_1"
 
-                        FlyTP(EggPos, FLY_SPEED, false, function()
+                        FlyTP(EggPos, FLY_SPEED, false, false, function()
                             local LockCF = GetLockCFrame(EggPos)
                             StartLock(LockCF)
                             StartAutoCollect()
