@@ -4,6 +4,7 @@
 -- Use Flag to prevent double teleport
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
+-- Fast Reset on Stop / Safe Zone
 --==================================================
 
 local Players = game:GetService("Players")
@@ -40,7 +41,7 @@ local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
 local FLY_SPEED = 1100
-local RETURN_SPEED = 1000
+local RETURN_SPEED = 1100
 local FLY_OFFSET = 3
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -370,13 +371,11 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
             return
         end
 
-        -- បើ Teleport រួច → Stop
         if Teleported then
             CleanupMovers()
             return
         end
 
-        -- Timeout
         if tick() - StartTime > 15 then
             CleanupMovers()
             Hum2.PlatformStand = false
@@ -514,7 +513,7 @@ local function StopHeartbeat()
 end
 
 --==================================================
--- FULL RESET
+-- FULL RESET (Fast)
 --==================================================
 
 function FullReset()
@@ -594,7 +593,7 @@ local function StartMainLoop()
 end
 
 --==================================================
--- ENABLE / DISABLE
+-- ENABLE / DISABLE / RESET (Fast)
 --==================================================
 
 local function Enable()
@@ -626,8 +625,9 @@ local function Enable()
 end
 
 local function Disable()
+    -- Reset ភ្លាមៗ
     FullReset()
-    print("[YOKUDO] Teleport System: OFF")
+    print("[YOKUDO] Teleport System: OFF (Fast Reset)")
 end
 
 local function SetTargetId(Id)
@@ -668,4 +668,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Fixed Shake)")
+print("✅ TeleportSystem Feature Loaded (Fast Reset)")
