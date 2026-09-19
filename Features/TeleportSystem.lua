@@ -1,6 +1,6 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
--- Egg Collect via Remote (No Zoom, No Hover)
+-- Egg Collect via Remote + Clear Confirm
 -- ==================================================
 
 local Players = game:GetService("Players")
@@ -8,7 +8,6 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
@@ -40,9 +39,10 @@ local SAFE_LOCK_DISTANCE = 3
 local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 1
 
-local REMOTE_INTERVAL = 0.2
+local REMOTE_INTERVAL = 0.1
 local RETRY_WAIT = 2
 local COLLECT_TARGET = 2
+local CONFIRM_TIMEOUT = 3
 
 -- ==================================================
 -- STATE
@@ -59,6 +59,7 @@ local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
 local LastRemoteFire = 0
+local LockStartTime = 0
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -181,20 +182,22 @@ end
 -- FIRE REMOTE (Collect)
 -- ==================================================
 local function FireAskCarry()
-    if not TARGET_ID then return end
+    if not TARGET_ID then return false end
     
     local now = tick()
-    if now - LastRemoteFire < REMOTE_INTERVAL then return end
+    if now - LastRemoteFire < REMOTE_INTERVAL then return false end
     LastRemoteFire = now
     
     local Remote = GetAskCarryRemote()
-    if not Remote then return end
+    if not Remote then return false end
     
-    pcall(function()
+    local Success = pcall(function()
         Remote:InvokeServer({
             Uid = TARGET_ID
         })
     end)
+    
+    return Success
 end
 
 -- ==================================================
@@ -256,16 +259,13 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE then
                 CleanupMovers()
-
                 Hum2.PlatformStand = false
                 Root2.CFrame = CFrame.new(SAFE_ZONE)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
-
                 if Callback then Callback() end
                 return
             end
@@ -274,24 +274,20 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         if UseShotTP and HorizDist <= SHOT_DISTANCE and not ShotDone then
             ShotDone = true
             CleanupMovers()
-
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
             if Callback then Callback() end
             return
         end
 
         if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
             CleanupMovers()
-
             Hum2.PlatformStand = false
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
             if Callback then Callback() end
             return
         end
@@ -336,6 +332,7 @@ local function ResetStateRetry()
     WaitingRetry = false
     RetryStartTime = 0
     GoingToSafe = false
+    LockStartTime = 0
 
     CleanupMovers()
 
@@ -357,6 +354,7 @@ local function FullReset()
     RetryStartTime = 0
     GoingToSafe = false
     CollectCount = 0
+    LockStartTime = 0
 
     CleanupMovers()
     if ActiveHeartbeat then
@@ -391,7 +389,6 @@ local function StartActiveHeartbeat()
         -- WAIT RETRY
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
-
             if Elapsed >= RETRY_WAIT then
                 if CollectCount >= COLLECT_TARGET then
                     WaitingRetry = false
@@ -403,7 +400,9 @@ local function StartActiveHeartbeat()
             return
         end
 
-        -- FAST Y CHECK (Confirm Collect)
+        -- ============================================
+        -- CONFIRM COLLECT (Y Check + Egg Gone Check)
+        -- ============================================
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
@@ -411,21 +410,38 @@ local function StartActiveHeartbeat()
             CurrentY = GetEggY(CurrentEgg)
         end
 
+        -- Confirm 1: Y Change
+        local YConfirmed = false
         if SavedYBefore and CurrentY and not CollectDone then
             if CurrentY - SavedYBefore >= Y_CHANGE_THRESHOLD then
-                CollectDone = true
-                CollectCount = CollectCount + 1
-
-                if CollectCount >= COLLECT_TARGET then
-                    FlyToSafeZone()
-                else
-                    WaitingRetry = true
-                    RetryStartTime = tick()
-                end
+                YConfirmed = true
             end
         end
 
+        -- Confirm 2: Egg Gone
+        local EggGone = false
+        if SavedYBefore and not CurrentEgg then
+            EggGone = true
+        end
+
+        -- បើ Confirm ណាមួយពិត → Collect
+        if (YConfirmed or EggGone) and not CollectDone then
+            CollectDone = true
+            CollectCount = CollectCount + 1
+
+            print("[YOKUDO] Collect Confirmed #" .. CollectCount .. " (" .. (YConfirmed and "Y Change" or "Egg Gone") .. ")")
+
+            if CollectCount >= COLLECT_TARGET then
+                FlyToSafeZone()
+            else
+                WaitingRetry = true
+                RetryStartTime = tick()
+            end
+        end
+
+        -- ============================================
         -- LOCK + FIRE REMOTE (គ្មាន Zoom គ្មាន Hover)
+        -- ============================================
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -444,14 +460,23 @@ local function StartActiveHeartbeat()
             Root.AssemblyLinearVelocity = Vector3.zero
             Root.AssemblyAngularVelocity = Vector3.zero
 
-            -- Save Y Before
+            -- Save Y Before (រាល់ពេល Lock)
             local Y = GetEggY(TargetEgg)
             if Y and not SavedYBefore then
                 SavedYBefore = Y
+                LockStartTime = tick()
             end
 
-            -- Fire Remote
+            -- Fire Remote (រាល់ REMOTE_INTERVAL)
             FireAskCarry()
+
+            -- Timeout: បើរង់ចាំយូរពេក → Reset
+            if LockStartTime > 0 and tick() - LockStartTime > CONFIRM_TIMEOUT then
+                print("[YOKUDO] Confirm Timeout - Retry")
+                SavedYBefore = nil
+                LockStartTime = 0
+                CurrentStep = "idle"
+            end
 
         elseif CurrentStep == "to_safe" then
 
@@ -489,6 +514,7 @@ local function StartMainLoop()
                 if Dist > MIN_FLY_DISTANCE then
                     TargetEgg = CachedEgg
                     SavedYBefore = nil
+                    LockStartTime = 0
 
                     CurrentStep = "to_egg"
 
@@ -521,7 +547,7 @@ local function Enable()
     StartActiveHeartbeat()
     StartMainLoop()
 
-    print("[YOKUDO] Teleport System: ON (Remote)")
+    print("[YOKUDO] Teleport System: ON (Remote + Confirm)")
 end
 
 local function Disable()
@@ -562,4 +588,4 @@ _G.YOKUDO_TeleportSystem = {
     GetAskCarryRemote = GetAskCarryRemote
 }
 
-print("✅ TeleportSystem Feature Loaded (Remote)")
+print("✅ TeleportSystem Feature Loaded (Remote + Clear Confirm)")
