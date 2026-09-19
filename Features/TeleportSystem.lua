@@ -1,12 +1,11 @@
 -- ==================================================
 -- YOKUDO HUB | FEATURE | Teleport System
--- Egg Collect + Fast Return to Safe
--- Top-Down Camera + Lock
+-- Egg Collect via Remote (No Zoom, No Hover)
 -- ==================================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -14,23 +13,26 @@ local Camera = workspace.CurrentCamera
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
 -- ==================================================
--- PROXIMITY PROMPT
+-- REMOTE
 -- ==================================================
-ProximityPromptService.PromptShown:Connect(function(prompt)
-    prompt.HoldDuration = 0
-    prompt.RequiresLineOfSight = false
-    prompt.MaxActivationDistance = 8
-    prompt.Enabled = true
-end)
+local function GetAskCarryRemote()
+    local Success, Remote = pcall(function()
+        return ReplicatedStorage.Packages.Networking["RF/EggWorld/AskFieldEggCarry"]
+    end)
+    if Success and Remote then
+        return Remote
+    end
+    return nil
+end
 
 -- ==================================================
 -- SETTINGS
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1100
-local RETURN_SPEED = 1000
-local FLY_OFFSET = 40
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
+local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
 local SAFE_LOCK_DISTANCE = 3
@@ -38,14 +40,7 @@ local SAFE_LOCK_DISTANCE = 3
 local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 1
 
--- CAMERA SETTINGS (Top-Down View)
-local CAMERA_HEIGHT = 3        -- កម្ពស់ Camera ពីលើ Egg
-local CAMERA_DISTANCE = 0      -- ចម្ងាយពី Egg (0 = មើលពីលើតែម្តង)
-local CAMERA_ZOOM_STEP = 0.5   -- Zoom បន្ថែមពេលមិនឃើញ Hover
-local CAMERA_MIN_HEIGHT = 1    -- កម្ពស់អប្បបរមា
-local LOCK_WAIT = 0.2
-
-local LOOP_INTERVAL = 0.02
+local REMOTE_INTERVAL = 0.2
 local RETRY_WAIT = 2
 local COLLECT_TARGET = 2
 
@@ -58,17 +53,12 @@ local CollectCount = 0
 local Running = false
 local CurrentStep = "idle"
 local TargetEgg = nil
-local TargetPromptPart = nil
-local TargetHover = nil
-local LockStartTime = 0
-local CurrentCameraHeight = CAMERA_HEIGHT
 local SavedYBefore = nil
 local CollectDone = false
 local RetryStartTime = 0
 local WaitingRetry = false
 local GoingToSafe = false
-local OriginalCameraSubject = nil
-local CameraLocked = false
+local LastRemoteFire = 0
 
 local FlyConnection = nil
 local BodyVelocity = nil
@@ -145,7 +135,7 @@ local function CleanupMovers()
 end
 
 -- ==================================================
--- FIND EGG (Check ទាំង Container និង Workspace)
+-- FIND EGG
 -- ==================================================
 local function FindEggAnywhere()
     if not TARGET_ID then return nil end
@@ -188,122 +178,23 @@ local function GetEggDistance(Egg)
 end
 
 -- ==================================================
--- HOVER IN TARGET
+-- FIRE REMOTE (Collect)
 -- ==================================================
-local function FindHoverInTarget()
-    if not TARGET_ID then return nil end
+local function FireAskCarry()
+    if not TARGET_ID then return end
     
-    if Container then
-        local Slot = Container:FindFirstChild(TARGET_ID)
-        if Slot then
-            local Hover = Slot:FindFirstChild("AreaEggHover")
-            if Hover then return Hover end
-        end
-    end
-
-    local WSEgg = workspace:FindFirstChild(TARGET_ID)
-    if WSEgg then
-        local Hover = WSEgg:FindFirstChild("AreaEggHover")
-        if Hover then return Hover end
-    end
-
-    return nil
-end
-
--- ==================================================
--- SMART PROMPT
--- ==================================================
-local function FindSmartPromptNearTarget(EggPos)
-    if not EggPos then return nil end
-
-    local ClosestPrompt = nil
-    local ClosestDist = 999
-
-    for _, Desc in ipairs(workspace:GetDescendants()) do
-        if Desc.Name == "SmartPromptPart" then
-            local Prompt = Desc:FindFirstChild("CarryAreaEgg")
-            if Prompt and Prompt:IsA("ProximityPrompt") then
-                local Dist = (Desc.Position - EggPos).Magnitude
-                if Dist < ClosestDist then
-                    ClosestDist = Dist
-                    ClosestPrompt = Prompt
-                end
-            end
-        end
-    end
-
-    if ClosestPrompt then
-        ClosestPrompt.Enabled = true
-        ClosestPrompt.HoldDuration = 0
-        ClosestPrompt.RequiresLineOfSight = false
-        ClosestPrompt.MaxActivationDistance = 8
-    end
-
-    return ClosestPrompt
-end
-
--- ==================================================
--- CAMERA FORCE (Top-Down View - មើលពីលើ)
--- ==================================================
-local function ForceCameraToEgg(EggPos, Height)
-    if not Camera then return end
-
-    if OriginalCameraSubject == nil then
-        OriginalCameraSubject = Camera.CameraSubject
-    end
-
-    Camera.CameraType = Enum.CameraType.Scriptable
-    CameraLocked = true
-
-    local H = Height or CAMERA_HEIGHT
-    local CamPos = EggPos + Vector3.new(0, H, 0) -- មើលពីលើចុះក្រោម
-
-    Camera.CFrame = CFrame.new(CamPos, EggPos)
-    Camera.Focus = CFrame.new(EggPos)
-end
-
-local function ResetCamera()
-    if not Camera then return end
-
-    Camera.CameraType = Enum.CameraType.Custom
-    CameraLocked = false
-
-    local Hum, Root = GetHumanoid()
-    if Hum then
-        Camera.CameraSubject = Hum
-    elseif OriginalCameraSubject then
-        Camera.CameraSubject = OriginalCameraSubject
-    end
-
-    OriginalCameraSubject = nil
-end
-
--- ==================================================
--- FACE EGG
--- ==================================================
-local function FaceEgg(EggPos)
-    local Hum, Root = GetHumanoid()
-    if not Root then return end
-
-    local Direction = (EggPos - Root.Position)
-    local FlatDir = Vector3.new(Direction.X, 0, Direction.Z)
-
-    if FlatDir.Magnitude > 0.1 then
-        Root.CFrame = CFrame.new(Root.Position, Root.Position + FlatDir.Unit)
-    end
-end
-
--- ==================================================
--- PROMPT TARGET
--- ==================================================
-local function PromptTarget()
-    if not TargetPromptPart then return end
-
-    if TargetPromptPart:IsA("ProximityPrompt") then
-        pcall(function()
-            fireproximityprompt(TargetPromptPart)
-        end)
-    end
+    local now = tick()
+    if now - LastRemoteFire < REMOTE_INTERVAL then return end
+    LastRemoteFire = now
+    
+    local Remote = GetAskCarryRemote()
+    if not Remote then return end
+    
+    pcall(function()
+        Remote:InvokeServer({
+            Uid = TARGET_ID
+        })
+    end)
 end
 
 -- ==================================================
@@ -429,30 +320,22 @@ local function FlyToSafeZone()
     GoingToSafe = true
     CurrentStep = "to_safe"
 
-    -- Reset Camera មុនពេល Fly ទៅ Safe Zone
-    ResetCamera()
-
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
         CurrentStep = "stop"
+        FullReset()
     end)
 end
 
 -- ==================================================
--- RESET STATE RETRY (Round #1 → Round #2)
--- មិន Reset Camera ទេ - រក្សា Camera Lock ជាប់
+-- RESET STATE RETRY
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
-    TargetPromptPart = nil
-    TargetHover = nil
-    LockStartTime = 0
     SavedYBefore = nil
     CollectDone = false
     WaitingRetry = false
     RetryStartTime = 0
     GoingToSafe = false
-    -- មិន Reset CurrentCameraHeight ទេ - រក្សា Zoom ជាប់
-    -- មិន Reset Camera ទេ - រក្សា Camera Lock ជាប់
 
     CleanupMovers()
 
@@ -468,10 +351,6 @@ local function FullReset()
     CurrentStep = "idle"
 
     TargetEgg = nil
-    TargetPromptPart = nil
-    TargetHover = nil
-    LockStartTime = 0
-    CurrentCameraHeight = CAMERA_HEIGHT
     SavedYBefore = nil
     CollectDone = false
     WaitingRetry = false
@@ -488,7 +367,6 @@ local function FullReset()
         MainLoop:Disconnect()
         MainLoop = nil
     end
-    ResetCamera()
     RestoreStats()
 
     print("[YOKUDO] Full Reset")
@@ -510,9 +388,7 @@ local function StartActiveHeartbeat()
         if not Hum or not Root then return end
         if Hum.Health <= 0 then return end
 
-        -- ============================================
-        -- WAIT RETRY (2s before retry)
-        -- ============================================
+        -- WAIT RETRY
         if WaitingRetry then
             local Elapsed = tick() - RetryStartTime
 
@@ -527,9 +403,7 @@ local function StartActiveHeartbeat()
             return
         end
 
-        -- ============================================
         -- FAST Y CHECK (Confirm Collect)
-        -- ============================================
         local CurrentEgg = FindEggAnywhere()
         local CurrentY = nil
 
@@ -551,9 +425,7 @@ local function StartActiveHeartbeat()
             end
         end
 
-        -- ============================================
-        -- LOCK + FACE + CAMERA + HOVER + PROMPT
-        -- ============================================
+        -- LOCK + FIRE REMOTE (គ្មាន Zoom គ្មាន Hover)
         if CurrentStep == "lock_egg" then
             if not TargetEgg then
                 CurrentStep = "idle"
@@ -567,44 +439,21 @@ local function StartActiveHeartbeat()
                 return
             end
 
+            -- Lock 0 Distance
             Root.CFrame = CFrame.new(EggPos)
             Root.AssemblyLinearVelocity = Vector3.zero
             Root.AssemblyAngularVelocity = Vector3.zero
 
-            FaceEgg(EggPos)
-            ForceCameraToEgg(EggPos, CurrentCameraHeight)
-
-            local Elapsed = tick() - LockStartTime
-
-            if Elapsed >= LOCK_WAIT then
-                local Y = GetEggY(TargetEgg)
-                if Y and not SavedYBefore then
-                    SavedYBefore = Y
-                end
-
-                local Hover2 = FindHoverInTarget()
-
-                if Hover2 then
-                    TargetHover = Hover2
-
-                    if not TargetPromptPart then
-                        TargetPromptPart = FindSmartPromptNearTarget(EggPos)
-                    end
-
-                    if TargetPromptPart then
-                        PromptTarget()
-                    end
-                else
-                    -- បន្ថែមកម្ពស់ Camera ដើម្បី Zoom ចេញ
-                    CurrentCameraHeight = CurrentCameraHeight + CAMERA_ZOOM_STEP
-                    if CurrentCameraHeight > CAMERA_HEIGHT * 3 then
-                        CurrentCameraHeight = CAMERA_HEIGHT * 3
-                    end
-                end
+            -- Save Y Before
+            local Y = GetEggY(TargetEgg)
+            if Y and not SavedYBefore then
+                SavedYBefore = Y
             end
 
+            -- Fire Remote
+            FireAskCarry()
+
         elseif CurrentStep == "to_safe" then
-            -- Handled by FlyToSafeZone
 
         elseif CurrentStep == "stop" then
             FullReset()
@@ -639,14 +488,11 @@ local function StartMainLoop()
                 local Dist = GetEggDistance(CachedEgg)
                 if Dist > MIN_FLY_DISTANCE then
                     TargetEgg = CachedEgg
-                    TargetPromptPart = nil
                     SavedYBefore = nil
-                    -- មិន Reset CurrentCameraHeight ទេ - រក្សា Zoom ជាប់
 
                     CurrentStep = "to_egg"
 
                     FlyTP(EggPos, FLY_SPEED, true, function()
-                        LockStartTime = tick()
                         CurrentStep = "lock_egg"
                     end)
                 end
@@ -667,7 +513,6 @@ local function Enable()
     CurrentStep = "idle"
     CollectDone = false
     SavedYBefore = nil
-    TargetPromptPart = nil
     WaitingRetry = false
     GoingToSafe = false
     CollectCount = 0
@@ -676,7 +521,7 @@ local function Enable()
     StartActiveHeartbeat()
     StartMainLoop()
 
-    print("[YOKUDO] Teleport System: ON")
+    print("[YOKUDO] Teleport System: ON (Remote)")
 end
 
 local function Disable()
@@ -699,11 +544,7 @@ local function GetState()
         Running = Running,
         CurrentStep = CurrentStep,
         CollectCount = CollectCount,
-        TargetId = TARGET_ID,
-        Hover = TargetHover ~= nil,
-        Prompt = TargetPromptPart ~= nil,
-        CameraLocked = CameraLocked,
-        CameraHeight = CurrentCameraHeight
+        TargetId = TARGET_ID
     }
 end
 
@@ -717,7 +558,8 @@ _G.YOKUDO_TeleportSystem = {
     ResetState = ResetState,
     GetState = GetState,
     IsEnabled = function() return Running end,
-    GetTargetId = function() return TARGET_ID end
+    GetTargetId = function() return TARGET_ID end,
+    GetAskCarryRemote = GetAskCarryRemote
 }
 
-print("✅ TeleportSystem Feature Loaded (Top-Down Camera + Lock)")
+print("✅ TeleportSystem Feature Loaded (Remote)")
