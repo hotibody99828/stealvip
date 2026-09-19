@@ -1,9 +1,7 @@
 --==================================================
--- YOKUDO HUB - EGG COLLECT (2 ROUNDS Y)
--- Round 1: Fly TP + Lock Behind 3 + Save Y + Collect
--- Y Change (1) -> Save YChanged -> Wait Y Return
--- Round 2: Y Return -> Fly TP + Lock Behind 3 + Collect
--- Y Change (2) -> Fly TP Safe Zone
+-- YOKUDO HUB - EGG COLLECT (FIX TELEPORT SHAKE)
+-- Fix: Shot TP + Arrive conflict
+-- Use Flag to prevent double teleport
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
 --==================================================
@@ -230,9 +228,7 @@ local function RemoteCollectEgg()
     if not Event or not TARGET_ID then return false end
 
     local success, result = pcall(function()
-        return Event:InvokeServer({
-            Uid = TARGET_ID
-        })
+        return Event:InvokeServer({ Uid = TARGET_ID })
     end)
 
     return success
@@ -271,7 +267,7 @@ local function StopLock()
 end
 
 --==================================================
--- FLY TP
+-- FLY TP (FIXED - No Shake)
 --==================================================
 
 local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
@@ -304,7 +300,7 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
     BodyGyro.Parent = Root
 
     local StartTime = tick()
-    local ShotDone = false
+    local Teleported = false
 
     FlyConnection = RunService.Heartbeat:Connect(function()
         if not Running then
@@ -330,9 +326,10 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
         local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE
+        -- SAFE ZONE (Shot TP)
         if Speed == RETURN_SPEED then
-            if HorizDist <= SAFE_LOCK_DISTANCE then
+            if HorizDist <= SAFE_LOCK_DISTANCE and not Teleported then
+                Teleported = true
                 CleanupMovers()
 
                 Hum2.PlatformStand = false
@@ -345,9 +342,9 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             end
         end
 
-        -- SHOT TP
-        if UseShotTP and HorizDist <= SHOT_DISTANCE and not ShotDone then
-            ShotDone = true
+        -- SHOT TP (ដំបូងតែម្ដង)
+        if UseShotTP and HorizDist <= SHOT_DISTANCE and not Teleported then
+            Teleported = true
             CleanupMovers()
 
             Hum2.PlatformStand = false
@@ -363,24 +360,11 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             return
         end
 
-        -- ARRIVE
-        if HorizDist <= ARRIVE_DISTANCE and VertDist <= 2 then
+        if Teleported then
             CleanupMovers()
-
-            Hum2.PlatformStand = false
-            Root2.CFrame = LockCFrame
-            Root2.AssemblyLinearVelocity = Vector3.zero
-            Root2.AssemblyAngularVelocity = Vector3.zero
-
-            if LockAfter then
-                StartLock(LockCFrame)
-            end
-
-            if Callback then Callback() end
             return
         end
 
-        -- TIMEOUT
         if tick() - StartTime > 15 then
             CleanupMovers()
             Hum2.PlatformStand = false
@@ -399,7 +383,7 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
 end
 
 --==================================================
--- AUTO COLLECT (Heartbeat)
+-- AUTO COLLECT (0.01s)
 --==================================================
 
 local function StartAutoCollect()
@@ -506,7 +490,7 @@ local function StopHeartbeat()
 end
 
 --==================================================
--- FULL RESET
+-- FULL RESET (Fast)
 --==================================================
 
 function FullReset()
@@ -551,7 +535,6 @@ local function StartMainLoop()
 
         local CachedSpawnEgg = FindEggInContainer()
         local CachedWSEgg = FindEggInWorkspace()
-        local CurrentEgg = CachedWSEgg or CachedSpawnEgg
 
         -- ROUND 1
         if CurrentStep == "idle" and ConfirmCount == 0 then
@@ -633,4 +616,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (2 Rounds Y)")
+print("✅ TeleportSystem Feature Loaded (Fixed Shake)")
