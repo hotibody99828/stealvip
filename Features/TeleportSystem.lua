@@ -39,8 +39,8 @@ print("[YOKUDO] Event found:", Event.ClassName)
 local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local WALK_SPEED = 1000
-local RETURN_SPEED = 1000
+local WALK_SPEED = 500
+local RETURN_SPEED = 350
 local SHOT_DISTANCE = 30
 local LOCK_BEHIND = 3
 local LOCK_HEIGHT = 3
