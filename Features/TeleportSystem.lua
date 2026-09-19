@@ -1,9 +1,9 @@
 --==================================================
 -- YOKUDO HUB - EGG COLLECT (2 ROUNDS Y) - FLY TP
--- Fly TP + Lock Behind 3
--- Round 1: Fly TP → Lock → Collect → Y Change (1)
--- Wait Y Return → Round 2: Fly TP → Lock → Collect → Y Change (2)
--- Safe Zone: Fly TP → Fast Reset
+-- Round 1: Fly TP → Lock Behind 3 → Collect
+-- Y Change (1) → Save YChange → Wait Y Return
+-- Round 2: Y Return → Fly TP → Lock Behind 3 → Collect
+-- Y Change (2) → Fly TP Safe Zone
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
 --==================================================
@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
+
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
 --==================================================
@@ -40,8 +41,8 @@ print("[YOKUDO] Event found:", Event.ClassName)
 local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1000
-local RETURN_SPEED = 1000
+local FLY_SPEED = 1100
+local RETURN_SPEED = 1100
 local SHOT_DISTANCE = 30
 local LOCK_BEHIND = 3
 local LOCK_HEIGHT = 3
@@ -339,7 +340,7 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
         local HorizDist = Vector3.new(Direction.X, 0, Direction.Z).Magnitude
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE
+        -- SAFE ZONE (Fast Reset)
         if Speed == RETURN_SPEED then
             if HorizDist <= SAFE_LOCK_DISTANCE and not Teleported then
                 Teleported = true
@@ -474,23 +475,30 @@ local function StartHeartbeat()
             CurrentY = GetEggY(CurrentEgg)
         end
 
+        -- ============================================
         -- WAIT Y RETURN (Round 2)
+        -- ============================================
         if IsWaitingReturn then
             if CurrentY and YOriginal then
                 local YDiff = math.abs(CurrentY - YOriginal)
 
                 if YDiff <= Y_RETURN_THRESHOLD then
+                    -- Y ត្រឡប់មកដើម → Start Round 2
+                    print("[YOKUDO] Y Returned! Start Round 2")
                     StartRound2()
                 end
             end
             return
         end
 
+        -- ============================================
         -- CHECK Y CHANGE
+        -- ============================================
         if CurrentY and YOriginal then
             local YDiff = math.abs(CurrentY - YOriginal)
 
             if YDiff >= Y_CHANGE_THRESHOLD then
+                -- Round 1 → Y Change (1) → Wait Return
                 if ConfirmCount == 0 then
                     ConfirmCount = 1
                     YChanged = CurrentY
@@ -504,6 +512,7 @@ local function StartHeartbeat()
 
                     print("[YOKUDO] Round 1: Y Changed! Waiting for Y Return")
 
+                -- Round 2 → Y Change (2) → Safe Zone
                 elseif ConfirmCount == 1 then
                     ConfirmCount = 2
 
@@ -624,6 +633,7 @@ local function StartMainLoop()
 
                         FlyTP(EggPos, FLY_SPEED, true, true, function()
                             StartAutoCollect()
+                            print("[YOKUDO] Round 1: Locked & Collecting")
                         end)
                     end
                 end
@@ -641,8 +651,10 @@ local function Enable()
     if not Event then warn("[YOKUDO] Event not found") return end
     if not TARGET_ID then warn("[YOKUDO] No Target ID") return end
 
+    -- Reset ទាំងអស់មុនពេល Start
     FullReset()
 
+    -- Start ថ្មី
     Running = true
     CurrentStep = "idle"
     ConfirmCount = 0
