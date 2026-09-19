@@ -1,9 +1,8 @@
 --==================================================
--- YOKUDO HUB - EGG COLLECT (FIX TELEPORT SHAKE)
--- Fix: Shot TP + Arrive conflict
--- Use Flag to prevent double teleport
+-- YOKUDO HUB - TELEPORT SYSTEM (IMPROVED)
+-- Short TP សម្រាប់ Egg តែប៉ុណ្ណោះ
+-- Fly TP ធម្មតាសម្រាប់ Safe Zone
 -- TARGET_ID: From Auto Farming Tab
--- Safe Zone: (533, 70, -366)
 --==================================================
 
 local Players = game:GetService("Players")
@@ -11,13 +10,11 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
-
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
 --==================================================
 -- EVENT
 --==================================================
-
 local Event = nil
 
 local success, result = pcall(function()
@@ -35,7 +32,6 @@ print("[YOKUDO] Event found:", Event.ClassName)
 --==================================================
 -- SETTINGS
 --==================================================
-
 local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
@@ -54,7 +50,9 @@ local Y_RETURN_THRESHOLD = 1
 local LOOP_INTERVAL = 0.05
 local COLLECT_INTERVAL = 0.01
 
--- TARGET
+--==================================================
+-- STATE
+--==================================================
 local TargetEgg = nil
 local YOriginal = nil
 local YChanged = nil
@@ -63,10 +61,6 @@ local IsGoingSafe = false
 local IsWaitingReturn = false
 local LockedCFrame = nil
 local IsLocked = false
-
---==================================================
--- STATE
---==================================================
 
 local Running = false
 local CurrentStep = "idle"
@@ -86,7 +80,6 @@ local SavedUseJumpPower = nil
 --==================================================
 -- GET HUMANOID
 --==================================================
-
 local function GetHumanoid()
     local Char = Player.Character
     if not Char then return nil, nil end
@@ -98,7 +91,6 @@ end
 --==================================================
 -- SAVE / RESTORE
 --==================================================
-
 local function SaveStats()
     local Hum = GetHumanoid()
     if not Hum then return end
@@ -120,7 +112,6 @@ end
 --==================================================
 -- CLEANUP
 --==================================================
-
 local function CleanupMovers()
     if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
     if LockConnection then LockConnection:Disconnect() LockConnection = nil end
@@ -151,7 +142,6 @@ end
 --==================================================
 -- FIND EGG
 --==================================================
-
 local function FindEggInContainer()
     if not Container or not TARGET_ID then return nil end
     local Direct = Container:FindFirstChild(TARGET_ID)
@@ -201,7 +191,6 @@ end
 --==================================================
 -- GET LOCK POSITION (Behind Egg 3)
 --==================================================
-
 local function GetLockCFrame(EggPos)
     local Hum, Root = GetHumanoid()
     if not Root then return CFrame.new(EggPos + Vector3.new(0, FLY_OFFSET, 0)) end
@@ -223,7 +212,6 @@ end
 --==================================================
 -- REMOTE COLLECT
 --==================================================
-
 local function RemoteCollectEgg()
     if not Event or not TARGET_ID then return false end
 
@@ -235,9 +223,8 @@ local function RemoteCollectEgg()
 end
 
 --==================================================
--- LOCK AT EGG (Behind 3)
+-- LOCK AT EGG
 --==================================================
-
 local function StartLock(TargetCFrame)
     IsLocked = true
     LockedCFrame = TargetCFrame
@@ -267,10 +254,9 @@ local function StopLock()
 end
 
 --==================================================
--- FLY TP (FIXED - No Shake)
+-- FLY TP (Short TP សម្រាប់ Egg)
 --==================================================
-
-local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
+local function FlyTP_Egg(Destination, Callback)
     CleanupMovers()
 
     local Hum, Root = GetHumanoid()
@@ -314,7 +300,6 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             return
         end
         if Hum2.Health <= 0 then return end
-
         if not BodyVelocity or not BodyGyro then
             CleanupMovers()
             return
@@ -323,27 +308,10 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
         local CurrentPos = Root2.Position
         local Direction = (FlyPos - CurrentPos)
         local HorizDist = Vector3.new(Direction.X, 0, Direction.Z).Magnitude
-        local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE (Shot TP)
-        if Speed == RETURN_SPEED then
-            if HorizDist <= SAFE_LOCK_DISTANCE and not Teleported then
-                Teleported = true
-                CleanupMovers()
-
-                Hum2.PlatformStand = false
-                Root2.CFrame = CFrame.new(SAFE_ZONE)
-                Root2.AssemblyLinearVelocity = Vector3.zero
-                Root2.AssemblyAngularVelocity = Vector3.zero
-
-                if Callback then Callback() end
-                return
-            end
-        end
-
-        -- SHOT TP (ដំបូងតែម្ដង)
-        if UseShotTP and HorizDist <= SHOT_DISTANCE and not Teleported then
+        -- Short TP (ជិត 30 studs)
+        if HorizDist <= SHOT_DISTANCE and not Teleported then
             Teleported = true
             CleanupMovers()
 
@@ -351,10 +319,6 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
-
-            if LockAfter then
-                StartLock(LockCFrame)
-            end
 
             if Callback then Callback() end
             return
@@ -373,7 +337,99 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
         end
 
         if TotalDist > 1 then
-            BodyVelocity.Velocity = Direction.Unit * Speed
+            BodyVelocity.Velocity = Direction.Unit * 1100
+        else
+            BodyVelocity.Velocity = Vector3.zero
+        end
+
+        BodyGyro.CFrame = CFrame.new(CurrentPos, CurrentPos + Vector3.new(Direction.X, 0, Direction.Z))
+    end)
+end
+
+--==================================================
+-- FLY TP (Fly ធម្មតាសម្រាប់ Safe Zone)
+--==================================================
+local function FlyTP_Safe(Destination, Callback)
+    CleanupMovers()
+
+    local Hum, Root = GetHumanoid()
+    if not Hum or not Root then return end
+    if Hum.Health <= 0 then return end
+
+    local FlyPos = Vector3.new(Destination.X, Destination.Y + FLY_OFFSET, Destination.Z)
+    local LockCFrame = CFrame.new(FlyPos)
+
+    Hum.PlatformStand = true
+    Hum.WalkSpeed = 0
+    Hum.JumpPower = 0
+
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.Name = "YokudoBV"
+    BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    BodyVelocity.P = 1250
+    BodyVelocity.Velocity = Vector3.zero
+    BodyVelocity.Parent = Root
+
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.Name = "YokudoBG"
+    BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    BodyGyro.P = 3000
+    BodyGyro.D = 500
+    BodyGyro.CFrame = Root.CFrame
+    BodyGyro.Parent = Root
+
+    local StartTime = tick()
+    local Done = false
+
+    FlyConnection = RunService.Heartbeat:Connect(function()
+        if not Running then
+            CleanupMovers()
+            return
+        end
+
+        local Hum2, Root2 = GetHumanoid()
+        if not Hum2 or not Root2 then
+            CleanupMovers()
+            return
+        end
+        if Hum2.Health <= 0 then return end
+        if not BodyVelocity or not BodyGyro then
+            CleanupMovers()
+            return
+        end
+
+        local CurrentPos = Root2.Position
+        local Direction = (FlyPos - CurrentPos)
+        local TotalDist = Direction.Magnitude
+
+        -- Fly ធម្មតា - ដល់ទីតាំងពិត
+        if TotalDist <= ARRIVE_DISTANCE and not Done then
+            Done = true
+            CleanupMovers()
+
+            Hum2.PlatformStand = false
+            Root2.CFrame = LockCFrame
+            Root2.AssemblyLinearVelocity = Vector3.zero
+            Root2.AssemblyAngularVelocity = Vector3.zero
+
+            if Callback then Callback() end
+            return
+        end
+
+        if Done then
+            CleanupMovers()
+            return
+        end
+
+        if tick() - StartTime > 15 then
+            CleanupMovers()
+            Hum2.PlatformStand = false
+            if Callback then Callback() end
+            return
+        end
+
+        if TotalDist > 1 then
+            BodyVelocity.Velocity = Direction.Unit * RETURN_SPEED
         else
             BodyVelocity.Velocity = Vector3.zero
         end
@@ -385,7 +441,6 @@ end
 --==================================================
 -- AUTO COLLECT (0.01s)
 --==================================================
-
 local function StartAutoCollect()
     if CollectConnection then CollectConnection:Disconnect() end
 
@@ -406,9 +461,8 @@ local function StopAutoCollect()
 end
 
 --==================================================
--- HEARTBEAT - CHECK Y
+-- HEARTBEAT - CHECK Y (លឿន + ច្បាស់)
 --==================================================
-
 local function StartHeartbeat()
     if HeartbeatConnection then HeartbeatConnection:Disconnect() end
 
@@ -441,7 +495,7 @@ local function StartHeartbeat()
                     local EggPos = GetEggPosition(CurrentEgg)
                     if EggPos then
                         local LockCF = GetLockCFrame(EggPos)
-                        FlyTP(EggPos, FLY_SPEED, false, false, function()
+                        FlyTP_Egg(EggPos, function()
                             StartLock(LockCF)
                             StartAutoCollect()
                         end)
@@ -475,7 +529,8 @@ local function StartHeartbeat()
 
                     IsGoingSafe = true
 
-                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
+                    -- Fly ធម្មតាទៅ Safe Zone
+                    FlyTP_Safe(SAFE_ZONE, function()
                         IsGoingSafe = false
                         FullReset()
                     end)
@@ -492,7 +547,6 @@ end
 --==================================================
 -- FULL RESET (Fast)
 --==================================================
-
 function FullReset()
     Running = false
     CurrentStep = "idle"
@@ -520,7 +574,6 @@ end
 --==================================================
 -- MAIN LOOP
 --==================================================
-
 local function StartMainLoop()
     if MainLoopConnection then MainLoopConnection:Disconnect() MainLoopConnection = nil end
 
@@ -550,8 +603,8 @@ local function StartMainLoop()
 
                         CurrentStep = "to_egg_1"
 
-                        FlyTP(EggPos, FLY_SPEED, false, false, function()
-                            local LockCF = GetLockCFrame(EggPos)
+                        local LockCF = GetLockCFrame(EggPos)
+                        FlyTP_Egg(EggPos, function()
                             StartLock(LockCF)
                             StartAutoCollect()
                         end)
@@ -565,7 +618,6 @@ end
 --==================================================
 -- ENABLE / DISABLE
 --==================================================
-
 local function Enable()
     if Running then return end
     if not Event then warn("[YOKUDO] Event not found") return end
@@ -606,7 +658,6 @@ end
 --==================================================
 -- EXPORT
 --==================================================
-
 _G.YOKUDO_TeleportSystem = {
     Enable = Enable,
     Disable = Disable,
@@ -616,4 +667,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Fixed Shake)")
+print("✅ TeleportSystem Feature Loaded (Short TP for Egg + Fly TP for Safe)")
