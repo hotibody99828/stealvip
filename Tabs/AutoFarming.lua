@@ -3,6 +3,7 @@
 -- ==================================================
 
 local TabsManager = _G.YOKUDO_TabsManager
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local AutoFarmingTab, AutoFarmingPage = TabsManager:RegisterTab("Auto Farming", 4, "AUTO_FARMING")
@@ -103,6 +104,14 @@ local function UpdateGetEggBox(Icon, Name, Rate, EggId)
     GetEggName.Text = Name or "No Egg Selected"
     GetEggRate.Text = "$" .. (_G.YOKUDO_AutoFarm and _G.YOKUDO_AutoFarm.FormatMoney(Rate or 0) or tostring(Rate or 0)) .. "/s"
     SelectedEggId = EggId
+
+    GetEggIcon.ImageTransparency = 1
+    GetEggName.TextTransparency = 1
+    GetEggRate.TextTransparency = 1
+
+    TweenService:Create(GetEggIcon, TweenInfo.new(0.2), {ImageTransparency = 0}):Play()
+    TweenService:Create(GetEggName, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+    TweenService:Create(GetEggRate, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
 end
 
 local function ToggleGetEgg()
@@ -112,15 +121,7 @@ local function ToggleGetEgg()
         GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         GetEggCheckButton.BackgroundTransparency = 0
         GetEggCheckStroke.Color = Color3.fromRGB(135, 120, 225)
-        
         if SelectedEggId and _G.YOKUDO_TeleportSystem then
-            -- បើកំពុង Run → Stop មុន
-            if _G.YOKUDO_TeleportSystem.IsEnabled() then
-                _G.YOKUDO_TeleportSystem.Disable()
-                task.wait(0.2)
-            end
-            
-            -- Set Target ថ្មី និង Start
             _G.YOKUDO_TeleportSystem.SetTargetId(SelectedEggId)
             _G.YOKUDO_TeleportSystem.Enable()
         end
@@ -128,7 +129,6 @@ local function ToggleGetEgg()
         GetEggCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         GetEggCheckButton.BackgroundTransparency = 0.85
         GetEggCheckStroke.Color = Color3.fromRGB(255, 255, 255)
-        
         if _G.YOKUDO_TeleportSystem then
             _G.YOKUDO_TeleportSystem.Disable()
             _G.YOKUDO_TeleportSystem.ResetState()
@@ -369,14 +369,14 @@ EggListLayout.Padding = UDim.new(0, 4)
 EggListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 EggListLayout.Parent = EggScrollFrame
 
-workspace.AreaEggSlotsClient.ChildAdded:Connect(function()
+Container.ChildAdded:Connect(function()
     task.wait(0.2)
     if CheckEggEnabled then
         RefreshEggList()
     end
 end)
 
-workspace.AreaEggSlotsClient.ChildRemoved:Connect(function()
+Container.ChildRemoved:Connect(function()
     task.wait(0.2)
     if CheckEggEnabled then
         RefreshEggList()
