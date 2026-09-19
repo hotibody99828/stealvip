@@ -41,7 +41,7 @@ local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 72    -- Confirm ពេល Y កើនឡើង 72
 
 local REMOTE_INTERVAL = 0.01
-local RETRY_WAIT = 1
+local RETRY_WAIT = 2
 local COLLECT_TARGET = 2
 local CONFIRM_TIMEOUT = 5
 
