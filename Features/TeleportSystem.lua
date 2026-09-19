@@ -39,8 +39,8 @@ print("[YOKUDO] Event found:", Event.ClassName)
 local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local WALK_SPEED = 1000
-local RETURN_SPEED = 1000
+local WALK_SPEED = 500
+local RETURN_SPEED = 350
 local SHOT_DISTANCE = 30
 local LOCK_BEHIND = 3
 local LOCK_HEIGHT = 3
@@ -60,7 +60,6 @@ local YChanged = nil
 local ConfirmCount = 0
 local IsGoingSafe = false
 local IsWaitingReturn = false
-local IsRound2Active = false -- Flag: Round 2 កំពុងដំណើរការ
 local LockedCFrame = nil
 local IsLocked = false
 
@@ -232,7 +231,11 @@ local function RemoteCollectEgg()
         })
     end)
 
-    return success
+    if success then
+        return true
+    else
+        return false
+    end
 end
 
 --==================================================
@@ -243,7 +246,9 @@ local function StartLock(TargetCFrame)
     IsLocked = true
     LockedCFrame = TargetCFrame
 
-    if LockConnection then LockConnection:Disconnect() end
+    if LockConnection then
+        LockConnection:Disconnect()
+    end
 
     LockConnection = RunService.Heartbeat:Connect(function()
         if not IsLocked then return end
@@ -390,7 +395,9 @@ end
 --==================================================
 
 local function StartAutoCollect()
-    if CollectConnection then CollectConnection:Disconnect() end
+    if CollectConnection then
+        CollectConnection:Disconnect()
+    end
 
     CollectConnection = RunService.Heartbeat:Connect(function()
         if not Running then
@@ -412,36 +419,13 @@ local function StopAutoCollect()
 end
 
 --==================================================
--- START ROUND 2
---==================================================
-local function StartRound2()
-    IsWaitingReturn = false
-    IsRound2Active = true -- Flag: Round 2 កំពុងដំណើរការ
-    YChanged = nil
-    CurrentStep = "to_egg_2"
-
-    local CurrentEgg = workspace:FindFirstChild(TARGET_ID) or (Container and Container:FindFirstChild(TARGET_ID))
-    if CurrentEgg then
-        TargetEgg = CurrentEgg
-        local EggPos = GetEggPosition(CurrentEgg)
-        if EggPos then
-            WalkTP(EggPos, WALK_SPEED, true, true, function()
-                StartAutoCollect()
-                print("[YOKUDO] Round 2: Locked & Collecting")
-            end)
-        end
-    else
-        task.wait(0.5)
-        StartRound2()
-    end
-end
-
---==================================================
 -- HEARTBEAT - CHECK Y
 --==================================================
 
 local function StartHeartbeat()
-    if HeartbeatConnection then HeartbeatConnection:Disconnect() end
+    if HeartbeatConnection then
+        HeartbeatConnection:Disconnect()
+    end
 
     HeartbeatConnection = RunService.Heartbeat:Connect(function()
         if not Running then return end
@@ -464,8 +448,19 @@ local function StartHeartbeat()
                 local YDiff = math.abs(CurrentY - YOriginal)
 
                 if YDiff <= Y_RETURN_THRESHOLD then
-                    -- Y ត្រឡប់មកដើម → Start Round 2
-                    StartRound2()
+                    IsWaitingReturn = false
+
+                    TargetEgg = CurrentEgg
+                    YChanged = nil
+
+                    CurrentStep = "to_egg_2"
+
+                    local EggPos = GetEggPosition(CurrentEgg)
+                    if EggPos then
+                        WalkTP(EggPos, WALK_SPEED, true, true, function()
+                            StartAutoCollect()
+                        end)
+                    end
                 end
             end
             return
@@ -476,7 +471,6 @@ local function StartHeartbeat()
             local YDiff = math.abs(CurrentY - YOriginal)
 
             if YDiff >= Y_CHANGE_THRESHOLD then
-                -- Y Change លើកទី 1 (Round 1 Collect)
                 if ConfirmCount == 0 then
                     ConfirmCount = 1
                     YChanged = CurrentY
@@ -488,24 +482,17 @@ local function StartHeartbeat()
                     TargetEgg = nil
                     CurrentStep = "idle"
 
-                    print("[YOKUDO] Round 1: Y Changed! Waiting for Y Return")
-
-                -- Y Change លើកទី 2 (Round 2 Collect → Safe) — ត្រូវការ IsRound2Active
-                elseif ConfirmCount == 1 and IsRound2Active then
+                elseif ConfirmCount == 1 then
                     ConfirmCount = 2
-                    IsRound2Active = false
 
                     StopAutoCollect()
                     StopLock()
 
                     IsGoingSafe = true
 
-                    print("[YOKUDO] Round 2: Y Changed! Walk to Safe Zone")
-
                     WalkTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
                         IsGoingSafe = false
                         FullReset()
-                        print("[YOKUDO] Safe Zone: Reset Complete")
                     end)
                 end
             end
@@ -534,7 +521,6 @@ function FullReset()
     ConfirmCount = 0
     IsGoingSafe = false
     IsWaitingReturn = false
-    IsRound2Active = false
     LockedCFrame = nil
     IsLocked = false
 
@@ -563,7 +549,6 @@ local function StartMainLoop()
         if not Running then return end
         if IsGoingSafe then return end
         if IsWaitingReturn then return end
-        if IsRound2Active then return end -- កុំ Start Round 1 ពេល Round 2 កំពុងដំណើរការ
 
         local Hum, Root = GetHumanoid()
         if not Hum or not Root then return end
@@ -612,7 +597,6 @@ local function Enable()
     ConfirmCount = 0
     IsGoingSafe = false
     IsWaitingReturn = false
-    IsRound2Active = false
     YOriginal = nil
     YChanged = nil
     SaveStats()
@@ -651,4 +635,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Walk TP + 2 Rounds Y + Fixed)")
+print("✅ TeleportSystem Feature Loaded (Walk TP + Shot TP 30)")
