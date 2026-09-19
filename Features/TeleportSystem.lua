@@ -1,7 +1,8 @@
 --==================================================
--- YOKUDO HUB - TELEPORT SYSTEM (FIX TELEPORT SHAKE)
+-- YOKUDO HUB - TELEPORT SYSTEM (FINAL)
 -- Fix: Shot TP + Arrive conflict
--- Use Flag to prevent double teleport
+-- Fix: Fly TP to Safe Zone (No CFrame)
+-- Fix: No Shake on Arrive
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
 -- Fast Reset on Stop / Safe Zone
@@ -41,7 +42,7 @@ local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
 local FLY_SPEED = 1100
-local RETURN_SPEED = 1000
+local RETURN_SPEED = 1100
 local FLY_OFFSET = 3
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
@@ -282,10 +283,10 @@ local function StopLock()
 end
 
 --==================================================
--- FLY TP (FIXED - No Shake)
+-- FLY TP (FINAL)
 --==================================================
 
-local function FlyTP(Destination, Speed, UseShotTP, Callback)
+local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
     CleanupMovers()
 
     local Hum, Root = GetHumanoid()
@@ -341,9 +342,9 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
         local VertDist = math.abs(Direction.Y)
         local TotalDist = Direction.Magnitude
 
-        -- SAFE ZONE (Shot TP)
+        -- SAFE ZONE (Fly TP - រហូតដល់ដល់ពិត)
         if Speed == RETURN_SPEED then
-            if HorizDist <= SAFE_LOCK_DISTANCE and not Teleported then
+            if TotalDist <= SAFE_LOCK_DISTANCE and not Teleported then
                 Teleported = true
                 CleanupMovers()
 
@@ -357,7 +358,7 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
             end
         end
 
-        -- SHOT TP (ដំបូងតែម្តង)
+        -- SHOT TP (ដំបូងតែម្ដង)
         if UseShotTP and HorizDist <= SHOT_DISTANCE and not Teleported then
             Teleported = true
             CleanupMovers()
@@ -366,6 +367,10 @@ local function FlyTP(Destination, Speed, UseShotTP, Callback)
             Root2.CFrame = LockCFrame
             Root2.AssemblyLinearVelocity = Vector3.zero
             Root2.AssemblyAngularVelocity = Vector3.zero
+
+            if LockAfter then
+                StartLock(LockCFrame)
+            end
 
             if Callback then Callback() end
             return
@@ -461,7 +466,8 @@ local function StartHeartbeat()
                     local EggPos = GetEggPosition(CurrentEgg)
                     if EggPos then
                         local LockCF = GetLockCFrame(EggPos)
-                        FlyTP(EggPos, FLY_SPEED, false, function()
+                        FlyTP(EggPos, FLY_SPEED, false, false, function()
+                            task.wait(0.05)
                             StartLock(LockCF)
                             StartAutoCollect()
                         end)
@@ -495,7 +501,8 @@ local function StartHeartbeat()
 
                     IsGoingSafe = true
 
-                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
+                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
+                        task.wait(0.05)
                         IsGoingSafe = false
                         FullReset()
                     end)
@@ -580,7 +587,8 @@ local function StartMainLoop()
 
                         CurrentStep = "to_egg_1"
 
-                        FlyTP(EggPos, FLY_SPEED, false, function()
+                        FlyTP(EggPos, FLY_SPEED, false, false, function()
+                            task.wait(0.05)
                             local LockCF = GetLockCFrame(EggPos)
                             StartLock(LockCF)
                             StartAutoCollect()
@@ -625,7 +633,6 @@ local function Enable()
 end
 
 local function Disable()
-    -- Reset ភ្លាមៗ
     FullReset()
     print("[YOKUDO] Teleport System: OFF (Fast Reset)")
 end
@@ -668,4 +675,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Fast Reset)")
+print("✅ TeleportSystem Feature Loaded (Final)")
