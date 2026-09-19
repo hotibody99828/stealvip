@@ -1,9 +1,7 @@
 --==================================================
 -- YOKUDO HUB - EGG COLLECT (2 ROUNDS Y) - WALK TP
--- Logic:
 -- Round 1: Check → Walk TP → Lock → Collect → Y Change (1)
--- Wait Y Return
--- Round 2: Walk TP → Lock → Collect → Y Change (2)
+-- Wait Y Return → Round 2: Walk TP → Lock → Collect → Y Change (2)
 -- Safe Zone: Walk TP → Fast Reset
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
@@ -56,18 +54,19 @@ local Y_RETURN_THRESHOLD = 1
 
 local LOOP_INTERVAL = 0.05
 
---==================================================
--- STATE
---==================================================
-
+-- TARGET
 local TargetEgg = nil
 local YOriginal = nil
 local YChanged = nil
-local RoundIndex = 0 -- 0 = Round 1, 1 = Wait Return, 2 = Round 2
-
+local ConfirmCount = 0
 local IsGoingSafe = false
+local IsWaitingReturn = false
 local LockedCFrame = nil
 local IsLocked = false
+
+--==================================================
+-- STATE
+--==================================================
 
 local Running = false
 local CurrentStep = "idle"
@@ -152,7 +151,8 @@ end
 --==================================================
 
 local function FindEggInContainer()
-    if not Container or not TARGET_ID then return nil end
+    if not Container then return nil end
+    if not TARGET_ID then return nil end
     local Direct = Container:FindFirstChild(TARGET_ID)
     if Direct then return Direct end
     for _, Desc in ipairs(Container:GetDescendants()) do
@@ -338,7 +338,7 @@ local function WalkTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             return
         end
 
-        -- SAFE ZONE
+        -- SAFE ZONE (Fast Reset)
         if Speed == RETURN_SPEED then
             if Distance <= SAFE_LOCK_DISTANCE then
                 IsFinished = true
@@ -406,7 +406,7 @@ local function StartAutoCollect()
             return
         end
         if IsGoingSafe then return end
-        if RoundIndex == 1 then return end -- Wait Y Return
+        if IsWaitingReturn then return end
 
         RemoteCollectEgg()
     end)
@@ -420,30 +420,10 @@ local function StopAutoCollect()
 end
 
 --==================================================
--- ROUND 1
+-- START ROUND 2 (Walk TP + Collect)
 --==================================================
-
-local function StartRound1(EggFound)
-    TargetEgg = EggFound
-    YOriginal = GetEggY(EggFound)
-    RoundIndex = 0
-    CurrentStep = "to_egg_1"
-
-    local EggPos = GetEggPosition(EggFound)
-    if EggPos then
-        WalkTP(EggPos, WALK_SPEED, true, true, function()
-            StartAutoCollect()
-            print("[YOKUDO] Round 1: Locked & Collecting")
-        end)
-    end
-end
-
---==================================================
--- ROUND 2
---==================================================
-
 local function StartRound2()
-    RoundIndex = 2
+    IsWaitingReturn = false
     CurrentStep = "to_egg_2"
 
     local CurrentEgg = workspace:FindFirstChild(TARGET_ID) or (Container and Container:FindFirstChild(TARGET_ID))
@@ -489,7 +469,7 @@ local function StartHeartbeat()
         -- ============================================
         -- WAIT Y RETURN (Round 2)
         -- ============================================
-        if RoundIndex == 1 then
+        if IsWaitingReturn then
             if CurrentY and YOriginal then
                 local YDiff = math.abs(CurrentY - YOriginal)
 
@@ -508,19 +488,23 @@ local function StartHeartbeat()
             local YDiff = math.abs(CurrentY - YOriginal)
 
             if YDiff >= Y_CHANGE_THRESHOLD then
-                -- Round 1 → Y Change (1)
-                if RoundIndex == 0 then
-                    RoundIndex = 1
+                -- Round 1 → Y Change (1) → Wait Return
+                if ConfirmCount == 0 then
+                    ConfirmCount = 1
                     YChanged = CurrentY
 
                     StopAutoCollect()
                     StopLock()
 
+                    IsWaitingReturn = true
+                    TargetEgg = nil
+                    CurrentStep = "idle"
+
                     print("[YOKUDO] Round 1: Y Changed! Waiting for Y Return")
 
                 -- Round 2 → Y Change (2) → Safe Zone
-                elseif RoundIndex == 2 then
-                    RoundIndex = 3
+                elseif ConfirmCount == 1 then
+                    ConfirmCount = 2
 
                     StopAutoCollect()
                     StopLock()
@@ -554,12 +538,13 @@ function FullReset()
     Running = false
     CurrentStep = "idle"
     IsGoingSafe = false
-    RoundIndex = 0
+    IsWaitingReturn = false
     IsLocked = false
 
     TargetEgg = nil
     YOriginal = nil
     YChanged = nil
+    ConfirmCount = 0
     LockedCFrame = nil
 
     -- 2. Disconnect Connections ភ្លាមៗ
@@ -600,8 +585,7 @@ local function StartMainLoop()
     MainLoopConnection = RunService.Heartbeat:Connect(function()
         if not Running then return end
         if IsGoingSafe then return end
-        if RoundIndex == 1 then return end -- Wait Return
-        if RoundIndex == 2 then return end -- Round 2 Active
+        if IsWaitingReturn then return end
 
         local Hum, Root = GetHumanoid()
         if not Hum or not Root then return end
@@ -611,7 +595,7 @@ local function StartMainLoop()
         local CachedWSEgg = FindEggInWorkspace()
 
         -- ROUND 1
-        if CurrentStep == "idle" and RoundIndex == 0 then
+        if CurrentStep == "idle" and ConfirmCount == 0 then
             local EggFound = CachedWSEgg or CachedSpawnEgg
 
             if EggFound then
@@ -619,7 +603,14 @@ local function StartMainLoop()
                 if EggPos then
                     local Dist = GetEggDistance(EggFound)
                     if Dist > MIN_FLY_DISTANCE then
-                        StartRound1(EggFound)
+                        TargetEgg = EggFound
+                        YOriginal = GetEggY(EggFound)
+
+                        CurrentStep = "to_egg_1"
+
+                        WalkTP(EggPos, WALK_SPEED, true, true, function()
+                            StartAutoCollect()
+                        end)
                     end
                 end
             end
@@ -640,8 +631,9 @@ local function Enable()
 
     Running = true
     CurrentStep = "idle"
-    RoundIndex = 0
+    ConfirmCount = 0
     IsGoingSafe = false
+    IsWaitingReturn = false
     YOriginal = nil
     YChanged = nil
     SaveStats()
