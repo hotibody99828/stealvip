@@ -40,7 +40,7 @@ local SAFE_LOCK_DISTANCE = 3
 local MIN_FLY_DISTANCE = 3
 local Y_CHANGE_THRESHOLD = 0.1     -- Y Check លឿនបំផុត
 
-local REMOTE_INTERVAL = 0.05       -- Fire Remote លឿនបំផុត
+local REMOTE_INTERVAL = 0.02       -- Fire Remote លឿនបំផុត
 local RETRY_WAIT = 1
 local COLLECT_TARGET = 2
 local CONFIRM_TIMEOUT = 3
