@@ -58,24 +58,24 @@ BuildMeshIdMap()
 local function GetPetData(AssetCategory)
     local Config = Configs:FindFirstChild(AssetCategory)
     if not Config then return nil end
-
+    
     local Data = {
         Name = AssetCategory,
         DisplayName = AssetCategory,
         EarningRate = 0,
         Icon = nil
     }
-
+    
     local Success, Module = pcall(function()
         return require(Config)
     end)
-
+    
     if Success and Module then
         Data.DisplayName = Module.DisplayName or AssetCategory
         Data.EarningRate = Module.EarningRate or 0
         Data.Icon = Module.Icon
     end
-
+    
     return Data
 end
 
@@ -107,7 +107,7 @@ local function CalculateRatePerSecond(EarningRate, Scale, Mutations)
     else
         PayoutFactor = (Scale / 5) ^ 1.2 * 19.637875755794113
     end
-
+    
     local MutationMultiplier = 1
     if Mutations and #Mutations > 0 then
         local Success, MutationsModule = pcall(function()
@@ -117,7 +117,7 @@ local function CalculateRatePerSecond(EarningRate, Scale, Mutations)
             MutationMultiplier = MutationsModule.EarningsFor(Mutations)
         end
     end
-
+    
     return math.round(EarningRate * PayoutFactor * MutationMultiplier)
 end
 
@@ -143,7 +143,7 @@ end
 -- ==================================================
 local function ScanEggs()
     EggList = {}
-
+    
     for _, child in ipairs(Container:GetChildren()) do
         if child:IsA("Model") then
             local AssetCategory = FindAssetCategory(child)
@@ -153,7 +153,7 @@ local function ScanEggs()
                     local Scale = child:GetAttribute("AssetScale") or 1
                     local Mutations = child:GetAttribute("Mutations") or {}
                     local RealRate = CalculateRatePerSecond(Data.EarningRate, Scale, Mutations)
-
+                    
                     table.insert(EggList, {
                         Id = child.Name,
                         Category = AssetCategory,
@@ -166,11 +166,11 @@ local function ScanEggs()
             end
         end
     end
-
+    
     table.sort(EggList, function(a, b)
         return a.EarningRate > b.EarningRate
     end)
-
+    
     return EggList
 end
 
@@ -193,7 +193,7 @@ end
 local function SelectEgg(EggData)
     SelectedEgg = EggData
     print("[YOKUDO] Selected Egg: " .. EggData.DisplayName .. " ($" .. FormatMoney(EggData.EarningRate) .. "/s)")
-
+    
     if _G.YOKUDO_TeleportSystem then
         _G.YOKUDO_TeleportSystem.SetTargetId(EggData.Id)
     end
