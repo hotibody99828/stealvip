@@ -1,7 +1,7 @@
 --==================================================
--- YOKUDO HUB - EGG COLLECT (FIX TELEPORT SHAKE)
--- Fix: Shot TP + Arrive conflict
--- Use Flag to prevent double teleport
+-- YOKUDO HUB - EGG COLLECT (2 ROUNDS Y) - WALK TP
+-- Walk TP + Shot TP 30 + Lock Behind 3
+-- Fix: Shot TP → Lock immediately (No overshoot)
 -- TARGET_ID: From Auto Farming Tab
 -- Safe Zone: (533, 70, -366)
 --==================================================
@@ -39,20 +39,19 @@ print("[YOKUDO] Event found:", Event.ClassName)
 local TARGET_ID = nil
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1000
+local WALK_SPEED = 1000
 local RETURN_SPEED = 1000
-local FLY_OFFSET = 3
 local SHOT_DISTANCE = 30
+local LOCK_BEHIND = 3
+local LOCK_HEIGHT = 3
 local ARRIVE_DISTANCE = 2
 local SAFE_LOCK_DISTANCE = 3
 
 local MIN_FLY_DISTANCE = 4
-local LOCK_BEHIND = 3
 local Y_CHANGE_THRESHOLD = 1
 local Y_RETURN_THRESHOLD = 1
 
 local LOOP_INTERVAL = 0.05
-local COLLECT_INTERVAL = 0.01
 
 -- TARGET
 local TargetEgg = nil
@@ -70,13 +69,11 @@ local IsLocked = false
 
 local Running = false
 local CurrentStep = "idle"
-local FlyConnection = nil
+local WalkConnection = nil
 local LockConnection = nil
 local CollectConnection = nil
 local HeartbeatConnection = nil
 local MainLoopConnection = nil
-local BodyVelocity = nil
-local BodyGyro = nil
 
 local SavedWalkSpeed = nil
 local SavedJumpPower = nil
@@ -122,23 +119,23 @@ end
 --==================================================
 
 local function CleanupMovers()
-    if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
-    if LockConnection then LockConnection:Disconnect() LockConnection = nil end
-    if BodyVelocity then
-        pcall(function()
-            BodyVelocity.Velocity = Vector3.zero
-            BodyVelocity.MaxForce = Vector3.zero
-        end)
-        BodyVelocity:Destroy()
-        BodyVelocity = nil
+    if WalkConnection then
+        WalkConnection:Disconnect()
+        WalkConnection = nil
     end
-    if BodyGyro then
-        pcall(function() BodyGyro.MaxTorque = Vector3.zero end)
-        BodyGyro:Destroy()
-        BodyGyro = nil
+    if LockConnection then
+        LockConnection:Disconnect()
+        LockConnection = nil
     end
     local Hum, Root = GetHumanoid()
-    if Hum then pcall(function() Hum.PlatformStand = false end) end
+    if Hum then
+        pcall(function()
+            Hum.PlatformStand = false
+            if Root then
+                Hum:MoveTo(Root.Position)
+            end
+        end)
+    end
     if Root then
         pcall(function()
             Root.AssemblyLinearVelocity = Vector3.zero
@@ -205,7 +202,7 @@ end
 
 local function GetLockCFrame(EggPos)
     local Hum, Root = GetHumanoid()
-    if not Root then return CFrame.new(EggPos + Vector3.new(0, FLY_OFFSET, 0)) end
+    if not Root then return CFrame.new(EggPos + Vector3.new(0, LOCK_HEIGHT, 0)) end
 
     local Dir = (EggPos - Root.Position)
     local FlatDir = Vector3.new(Dir.X, 0, Dir.Z)
@@ -216,7 +213,7 @@ local function GetLockCFrame(EggPos)
         FlatDir = Vector3.new(0, 0, 1)
     end
 
-    local LockPos = EggPos - (FlatDir * LOCK_BEHIND) + Vector3.new(0, FLY_OFFSET, 0)
+    local LockPos = EggPos - (FlatDir * LOCK_BEHIND) + Vector3.new(0, LOCK_HEIGHT, 0)
 
     return CFrame.new(LockPos, EggPos)
 end
@@ -234,15 +231,11 @@ local function RemoteCollectEgg()
         })
     end)
 
-    if success then
-        return true
-    else
-        return false
-    end
+    return success
 end
 
 --==================================================
--- LOCK AT EGG (Behind 3)
+-- LOCK AT EGG
 --==================================================
 
 local function StartLock(TargetCFrame)
@@ -278,72 +271,79 @@ local function StopLock()
 end
 
 --==================================================
--- FLY TP (FIXED - No Shake)
+-- WALK TP (with Shot TP 30 + Lock)
 --==================================================
 
-local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
+local function WalkTP(Destination, Speed, UseShotTP, LockAfter, Callback)
     CleanupMovers()
 
     local Hum, Root = GetHumanoid()
     if not Hum or not Root then return end
     if Hum.Health <= 0 then return end
 
-    local FlyPos = Vector3.new(Destination.X, Destination.Y + FLY_OFFSET, Destination.Z)
-    local LockCFrame = CFrame.new(FlyPos)
+    Hum.WalkSpeed = Speed
 
-    Hum.PlatformStand = true
-    Hum.WalkSpeed = 0
-    Hum.JumpPower = 0
-
-    BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.Name = "YokudoBV"
-    BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    BodyVelocity.P = 1250
-    BodyVelocity.Velocity = Vector3.zero
-    BodyVelocity.Parent = Root
-
-    BodyGyro = Instance.new("BodyGyro")
-    BodyGyro.Name = "YokudoBG"
-    BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    BodyGyro.P = 3000
-    BodyGyro.D = 500
-    BodyGyro.CFrame = Root.CFrame
-    BodyGyro.Parent = Root
+    local LockCF = GetLockCFrame(Destination)
 
     local StartTime = tick()
-    local Teleported = false
+    local ShotDone = false
+    local IsFinished = false
 
-    FlyConnection = RunService.Heartbeat:Connect(function()
+    WalkConnection = RunService.Heartbeat:Connect(function()
+        if IsFinished then return end
+
         if not Running then
+            IsFinished = true
             CleanupMovers()
             return
         end
 
         local Hum2, Root2 = GetHumanoid()
         if not Hum2 or not Root2 then
+            IsFinished = true
             CleanupMovers()
             return
         end
         if Hum2.Health <= 0 then return end
 
-        if not BodyVelocity or not BodyGyro then
-            CleanupMovers()
-            return
+        if Hum2.WalkSpeed ~= Speed then
+            Hum2.WalkSpeed = Speed
         end
 
         local CurrentPos = Root2.Position
-        local Direction = (FlyPos - CurrentPos)
-        local HorizDist = Vector3.new(Direction.X, 0, Direction.Z).Magnitude
-        local VertDist = math.abs(Direction.Y)
-        local TotalDist = Direction.Magnitude
+        local Distance = (Destination - CurrentPos).Magnitude
 
-        -- SAFE ZONE (Shot TP)
+        -- SHOT TP ពេលជិត 30 → LOCK ភ្លាម!
+        if UseShotTP and Distance <= SHOT_DISTANCE and not ShotDone then
+            ShotDone = true
+            IsFinished = true
+
+            if WalkConnection then WalkConnection:Disconnect() WalkConnection = nil end
+
+            Hum2:MoveTo(Root2.Position)
+            Hum2.WalkSpeed = SavedWalkSpeed or 16
+
+            Root2.CFrame = LockCF
+            Root2.AssemblyLinearVelocity = Vector3.zero
+            Root2.AssemblyAngularVelocity = Vector3.zero
+
+            if LockAfter then
+                StartLock(LockCF)
+            end
+
+            if Callback then Callback() end
+            return
+        end
+
+        -- SAFE ZONE
         if Speed == RETURN_SPEED then
-            if HorizDist <= SAFE_LOCK_DISTANCE and not Teleported then
-                Teleported = true
-                CleanupMovers()
+            if Distance <= SAFE_LOCK_DISTANCE then
+                IsFinished = true
+                if WalkConnection then WalkConnection:Disconnect() WalkConnection = nil end
 
-                Hum2.PlatformStand = false
+                Hum2:MoveTo(Root2.Position)
+                Hum2.WalkSpeed = SavedWalkSpeed or 16
+
                 Root2.CFrame = CFrame.new(SAFE_ZONE)
                 Root2.AssemblyLinearVelocity = Vector3.zero
                 Root2.AssemblyAngularVelocity = Vector3.zero
@@ -353,50 +353,39 @@ local function FlyTP(Destination, Speed, UseShotTP, LockAfter, Callback)
             end
         end
 
-        -- SHOT TP (ដំបូងតែម្តង)
-        if UseShotTP and HorizDist <= SHOT_DISTANCE and not Teleported then
-            Teleported = true
-            CleanupMovers()
+        -- Arrived (no Shot TP)
+        if not UseShotTP and Distance <= ARRIVE_DISTANCE then
+            IsFinished = true
+            if WalkConnection then WalkConnection:Disconnect() WalkConnection = nil end
 
-            Hum2.PlatformStand = false
-            Root2.CFrame = LockCFrame
-            Root2.AssemblyLinearVelocity = Vector3.zero
-            Root2.AssemblyAngularVelocity = Vector3.zero
+            Hum2:MoveTo(Root2.Position)
+            Hum2.WalkSpeed = SavedWalkSpeed or 16
 
             if LockAfter then
-                StartLock(LockCFrame)
+                StartLock(LockCF)
             end
 
             if Callback then Callback() end
             return
         end
 
-        -- បើ Teleport រួច → Stop
-        if Teleported then
-            CleanupMovers()
-            return
-        end
-
         -- Timeout
         if tick() - StartTime > 15 then
-            CleanupMovers()
-            Hum2.PlatformStand = false
+            IsFinished = true
+            if WalkConnection then WalkConnection:Disconnect() WalkConnection = nil end
+            Hum2:MoveTo(Root2.Position)
+            Hum2.WalkSpeed = SavedWalkSpeed or 16
             if Callback then Callback() end
             return
         end
 
-        if TotalDist > 1 then
-            BodyVelocity.Velocity = Direction.Unit * Speed
-        else
-            BodyVelocity.Velocity = Vector3.zero
-        end
-
-        BodyGyro.CFrame = CFrame.new(CurrentPos, CurrentPos + Vector3.new(Direction.X, 0, Direction.Z))
+        -- Move
+        Hum2:MoveTo(Destination)
     end)
 end
 
 --==================================================
--- AUTO COLLECT (Heartbeat)
+-- AUTO COLLECT
 --==================================================
 
 local function StartAutoCollect()
@@ -456,9 +445,7 @@ local function StartHeartbeat()
 
                     local EggPos = GetEggPosition(CurrentEgg)
                     if EggPos then
-                        local LockCF = GetLockCFrame(EggPos)
-                        FlyTP(EggPos, FLY_SPEED, false, false, function()
-                            StartLock(LockCF)
+                        WalkTP(EggPos, WALK_SPEED, true, true, function()
                             StartAutoCollect()
                         end)
                     end
@@ -491,7 +478,7 @@ local function StartHeartbeat()
 
                     IsGoingSafe = true
 
-                    FlyTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
+                    WalkTP(SAFE_ZONE, RETURN_SPEED, false, false, function()
                         IsGoingSafe = false
                         FullReset()
                     end)
@@ -572,9 +559,7 @@ local function StartMainLoop()
 
                         CurrentStep = "to_egg_1"
 
-                        local LockCF = GetLockCFrame(EggPos)
-                        FlyTP(EggPos, FLY_SPEED, false, false, function()
-                            StartLock(LockCF)
+                        WalkTP(EggPos, WALK_SPEED, true, true, function()
                             StartAutoCollect()
                         end)
                     end
@@ -638,4 +623,4 @@ _G.YOKUDO_TeleportSystem = {
     GetTargetId = function() return TARGET_ID end
 }
 
-print("✅ TeleportSystem Feature Loaded (Fixed Shake)")
+print("✅ TeleportSystem Feature Loaded (Walk TP + Shot TP 30)")
