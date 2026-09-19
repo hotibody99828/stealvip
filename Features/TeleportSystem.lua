@@ -8,7 +8,6 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
 local Container = workspace:WaitForChild("AreaEggSlotsClient")
 
@@ -30,9 +29,9 @@ end
 -- ==================================================
 local SAFE_ZONE = Vector3.new(533, 70, -366)
 
-local FLY_SPEED = 1100
-local RETURN_SPEED = 1000
-local FLY_OFFSET = 30
+local FLY_SPEED = 500
+local RETURN_SPEED = 350
+local FLY_OFFSET = 15
 local SHOT_DISTANCE = 30
 local ARRIVE_DISTANCE = 2
 local SAFE_LOCK_DISTANCE = 3
@@ -334,16 +333,17 @@ local function FlyToSafeZone()
 
     FlyTP(SAFE_ZONE, RETURN_SPEED, false, function()
         CurrentStep = "stop"
+        FullReset()
     end)
 end
 
 -- ==================================================
--- RESET STATE RETRY
+-- RESET STATE RETRY (Round #1 → Round #2)
 -- ==================================================
 local function ResetStateRetry()
     TargetEgg = nil
     LockStartTime = 0
-    SavedYBefore = nil
+    SavedYBefore = nil -- Reset Y (សំខាន់!)
     CollectDone = false
     WaitingRetry = false
     RetryStartTime = 0
@@ -530,7 +530,7 @@ local function StartMainLoop()
                 local Dist = GetEggDistance(CachedEgg)
                 if Dist > MIN_FLY_DISTANCE then
                     TargetEgg = CachedEgg
-                    SavedYBefore = nil
+                    SavedYBefore = nil -- Reset Y (សំខាន់!)
 
                     CurrentStep = "to_egg"
 
